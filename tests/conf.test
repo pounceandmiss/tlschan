@@ -1,0 +1,136 @@
+# conf.test --
+#
+#	Configuration errors, raised by import before any I/O.
+
+source [file join [file dirname [info script]] helpers.tcl]
+
+# Imports onto a throwaway channel; returns {code result errorCode} with
+# the first two words of the error code.
+proc try_import {args} {
+    global T
+    set f [open [info script]]
+    try {
+	set code [catch {${T}::import $f {*}$args} r opts]
+	list $code $r [expr {$code ? [lrange [dict get $opts -errorcode] 0 1] : ""}]
+    } finally {
+	catch {close $f}
+    }
+}
+
+proc server_opts {args} {
+    global server-cert server-key
+    list -server 1 -certfile ${server-cert} -keyfile ${server-key} {*}$args
+}
+
+# Protocols and cipher suites.
+
+test conf-1.1 {no protocols enabled} -body {
+    try_import -tls1.2 0 -tls1.3 0
+} -result {1 {no protocols enabled} {TLS PROTOCOL}}
+
+test conf-1.2 {unknown cipher} -body {
+    try_import -cipher NO-SUCH-CIPHER
+} -match glob -result {1 *unknown cipher*NO-SUCH-CIPHER* {TLS CONFIG}}
+
+test conf-1.3 {cipher list leaving no protocol} -body {
+    try_import -tls1.3 0 -cipher TLS_AES_128_GCM_SHA256
+} -match glob -result {1 *no usable cipher suites* {TLS CONFIG}}
+
+test conf-1.4 {cipher names in either option, IANA with dashes} -body {
+    list [lindex [try_import -ciphersuites \
+	    TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256] 0] \
+	[lindex [try_import -cipher TLS-AES-128-GCM-SHA256] 0]
+} -result {0 0}
+
+# Certificates and keys.
+
+test conf-2.1 {encrypted key, wrong password} -body {
+    try_import {*}[server_opts -keyfile ${server-key-enc} \
+	    -password {return wrong}]
+} -match glob -result {1 *wrong password* {TLS CONFIG}}
+
+test conf-2.2 {encrypted key, no password} -body {
+    try_import {*}[server_opts -keyfile ${server-key-enc}]
+} -match glob -result {1 *password required* {TLS CONFIG}}
+
+test conf-2.3 {-password script error} -body {
+    try_import {*}[server_opts -keyfile ${server-key-enc} \
+	    -password {error nope}]
+} -result {1 nope NONE}
+
+test conf-2.4 {key does not match certificate} -body {
+    try_import {*}[server_opts -keyfile ${client-key}]
+} -match glob -result {1 *private key does not match certificate* {TLS CONFIG}}
+
+test conf-2.5 {certificate that is not one} -body {
+    try_import {*}[server_opts -cert "not a certificate" -certfile {}]
+} -match glob -result {1 * {TLS CONFIG}}
+
+test conf-2.6 {missing certificate file} -body {
+    try_import -certfile /nonexistent/cert.pem
+} -match glob -result {1 *nonexistent/cert.pem* *}
+
+test conf-2.7 {missing CA file} -body {
+    try_import -cafile /nonexistent/ca.pem
+} -match glob -result {1 */nonexistent/ca.pem* *}
+
+test conf-2.8 {server without certificate} -body {
+    try_import -server 1
+} -match glob -result {1 *server requires a certificate and key* {TLS CONFIG}}
+
+test conf-2.9 {unreadable -cadir} -body {
+    try_import -cadir /nonexistent/dir
+} -match glob -result {1 *cannot read cadir* {TLS CONFIG}}
+
+# Names.
+
+test conf-3.1 {invalid server names} -body {
+    lmap n [list {bad name} a..b x.y [string repeat a 64].com] {
+	lindex [try_import -servername $n] 0
+    }
+} -result {1 1 0 1}
+
+test conf-3.2 {valid server names} -body {
+    lmap n {localhost www.tcl-lang.org 127.0.0.1 ::1 my_host.example} {
+	lindex [try_import -servername $n] 0
+    }
+} -result {0 0 0 0 0}
+
+test conf-3.3 {invalid ALPN names} -body {
+    list [try_import -alpn {h2 {}}] \
+	[lindex [try_import -alpn [list [string repeat x 256]]] 0]
+} -match glob -result {{1 *invalid ALPN protocol name* {TLS CONFIG}} 1}
+
+# -model and callbacks.
+
+test conf-4.1 {-model naming a client for a server} -setup {
+    lassign [socketpair] a b
+    ${T}::import $a
+} -body {
+    ${T}::import $b {*}[server_opts -model $a]
+} -cleanup {
+    close $a
+    close $b
+} -returnCodes error -match glob -result {*configured as a client}
+
+test conf-4.2 {-model naming a plain channel shares one configuration} \
+	-setup {
+    set f [open [info script]]
+    lassign [socketpair] a b
+    lassign [socketpair] c d
+} -body {
+    ${T}::import $a {*}[server_opts -model $f]
+    # Options after the first import are not looked at again.
+    ${T}::import $c -server 1 -model $f
+    close $f
+    dict get [${T}::connection $c] is_server
+} -cleanup {
+    foreach ch {a b c d} {catch {close [set $ch]}}
+} -result 1
+
+test conf-4.3 {empty -validatecommand and -command count as not given} \
+	-body {
+    lindex [try_import -vcmd {} -command {}] 0
+} -result 0
+
+cleanupTests

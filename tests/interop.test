@@ -1,0 +1,73 @@
+# interop.test --
+#
+#	The package under test against each other backend, in a child process.
+
+source [file join [file dirname [info script]] helpers.tcl]
+
+proc other_server {other args} {
+    global server-cert server-key ca-cert
+    set f [makeFile [string map [list @PKG@ $other] {
+	package require @PKG@
+	after 20000 exit
+	lassign $argv cert key ca
+	proc accept {c a p} {
+	    chan configure $c -blocking 0 -buffering line
+	    chan event $c readable [list apply {{c} {
+		if {[catch {gets $c line} n] || [eof $c]} {
+		    close $c
+		    set ::done 1
+		} elseif {$n >= 0} {
+		    puts $c "[@PKG@::version]: $line\
+			[dict get [@PKG@::status $c] protocol]"
+		}
+	    }} $c]
+	}
+	set s [@PKG@::socket -server accept -certfile $cert -keyfile $key \
+	    -cafile $ca {*}[lrange $argv 3 end] -myaddr 127.0.0.1 0]
+	puts [lindex [chan configure $s -sockname] 2]
+	flush stdout
+	vwait done
+    }] [string map {:: _} $other].tcl]
+    set pipe [open |[list [interpreter] $f ${server-cert} ${server-key} \
+	${ca-cert} {*}$args] r]
+    list $pipe [gets $pipe]
+}
+
+foreach other {tlschan::wolfssl tlschan::rustls tlschan::mbedtls tlschan::openssl} {
+    if {$other eq $pkg} continue
+    set b [namespace tail $other]
+    testConstraint $b [expr {![catch {
+	exec [interpreter] << "package require $other"
+    }]}]
+
+    foreach {n proto opts} {1 TLSv1.3 {} 2 TLSv1.2 {-tls1.3 0}} {
+	test interop-$b-1.$n "client against $other, $proto" \
+		-constraints $b -setup {
+	    lassign [other_server $other {*}$opts] pipe port
+	} -body {
+	    set c [${T}::socket -cafile ${ca-cert} 127.0.0.1 $port]
+	    chan configure $c -buffering line
+	    puts $c hello
+	    gets $c
+	} -cleanup {
+	    close $c
+	    close $pipe
+	} -match glob -result "* hello $proto"
+    }
+
+    test interop-$b-2.1 "mutual TLS against $other" -constraints $b \
+	    -setup {
+	lassign [other_server $other -require 1] pipe port
+    } -body {
+	set c [${T}::socket -cafile ${ca-cert} -certfile ${client-cert} \
+	    -keyfile ${client-key} 127.0.0.1 $port]
+	chan configure $c -buffering line
+	puts $c hello
+	gets $c
+    } -cleanup {
+	close $c
+	close $pipe
+    } -match glob -result "* hello TLSv1.3"
+}
+
+cleanupTests

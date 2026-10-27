@@ -1,0 +1,1267 @@
+'\"
+'\" Generated from file 'tlschan\&.man' by tcllib/doctools with format 'nroff'
+'\"
+.TH "tlschan" n 0\&.1 tlschan "TLS channels for Tcl 9"
+.\" The -*- nroff -*- definitions below are for supplemental macros used
+.\" in Tcl/Tk manual entries.
+.\"
+.\" .AP type name in/out ?indent?
+.\"	Start paragraph describing an argument to a library procedure.
+.\"	type is type of argument (int, etc.), in/out is either "in", "out",
+.\"	or "in/out" to describe whether procedure reads or modifies arg,
+.\"	and indent is equivalent to second arg of .IP (shouldn't ever be
+.\"	needed;  use .AS below instead)
+.\"
+.\" .AS ?type? ?name?
+.\"	Give maximum sizes of arguments for setting tab stops.  Type and
+.\"	name are examples of largest possible arguments that will be passed
+.\"	to .AP later.  If args are omitted, default tab stops are used.
+.\"
+.\" .BS
+.\"	Start box enclosure.  From here until next .BE, everything will be
+.\"	enclosed in one large box.
+.\"
+.\" .BE
+.\"	End of box enclosure.
+.\"
+.\" .CS
+.\"	Begin code excerpt.
+.\"
+.\" .CE
+.\"	End code excerpt.
+.\"
+.\" .VS ?version? ?br?
+.\"	Begin vertical sidebar, for use in marking newly-changed parts
+.\"	of man pages.  The first argument is ignored and used for recording
+.\"	the version when the .VS was added, so that the sidebars can be
+.\"	found and removed when they reach a certain age.  If another argument
+.\"	is present, then a line break is forced before starting the sidebar.
+.\"
+.\" .VE
+.\"	End of vertical sidebar.
+.\"
+.\" .DS
+.\"	Begin an indented unfilled display.
+.\"
+.\" .DE
+.\"	End of indented unfilled display.
+.\"
+.\" .SO ?manpage?
+.\"	Start of list of standard options for a Tk widget. The manpage
+.\"	argument defines where to look up the standard options; if
+.\"	omitted, defaults to "options". The options follow on successive
+.\"	lines, in three columns separated by tabs.
+.\"
+.\" .SE
+.\"	End of list of standard options for a Tk widget.
+.\"
+.\" .OP cmdName dbName dbClass
+.\"	Start of description of a specific option.  cmdName gives the
+.\"	option's name as specified in the class command, dbName gives
+.\"	the option's name in the option database, and dbClass gives
+.\"	the option's class in the option database.
+.\"
+.\" .UL arg1 arg2
+.\"	Print arg1 underlined, then print arg2 normally.
+.\"
+.\" .QW arg1 ?arg2?
+.\"	Print arg1 in quotes, then arg2 normally (for trailing punctuation).
+.\"
+.\" .PQ arg1 ?arg2?
+.\"	Print an open parenthesis, arg1 in quotes, then arg2 normally
+.\"	(for trailing punctuation) and then a closing parenthesis.
+.\"
+.\"	# Set up traps and other miscellaneous stuff for Tcl/Tk man pages.
+.if t .wh -1.3i ^B
+.nr ^l \n(.l
+.ad b
+.\"	# Start an argument description
+.de AP
+.ie !"\\$4"" .TP \\$4
+.el \{\
+.   ie !"\\$2"" .TP \\n()Cu
+.   el          .TP 15
+.\}
+.ta \\n()Au \\n()Bu
+.ie !"\\$3"" \{\
+\&\\$1 \\fI\\$2\\fP (\\$3)
+.\".b
+.\}
+.el \{\
+.br
+.ie !"\\$2"" \{\
+\&\\$1	\\fI\\$2\\fP
+.\}
+.el \{\
+\&\\fI\\$1\\fP
+.\}
+.\}
+..
+.\"	# define tabbing values for .AP
+.de AS
+.nr )A 10n
+.if !"\\$1"" .nr )A \\w'\\$1'u+3n
+.nr )B \\n()Au+15n
+.\"
+.if !"\\$2"" .nr )B \\w'\\$2'u+\\n()Au+3n
+.nr )C \\n()Bu+\\w'(in/out)'u+2n
+..
+.AS Tcl_Interp Tcl_CreateInterp in/out
+.\"	# BS - start boxed text
+.\"	# ^y = starting y location
+.\"	# ^b = 1
+.de BS
+.br
+.mk ^y
+.nr ^b 1u
+.if n .nf
+.if n .ti 0
+.if n \l'\\n(.lu\(ul'
+.if n .fi
+..
+.\"	# BE - end boxed text (draw box now)
+.de BE
+.nf
+.ti 0
+.mk ^t
+.ie n \l'\\n(^lu\(ul'
+.el \{\
+.\"	Draw four-sided box normally, but don't draw top of
+.\"	box if the box started on an earlier page.
+.ie !\\n(^b-1 \{\
+\h'-1.5n'\L'|\\n(^yu-1v'\l'\\n(^lu+3n\(ul'\L'\\n(^tu+1v-\\n(^yu'\l'|0u-1.5n\(ul'
+.\}
+.el \}\
+\h'-1.5n'\L'|\\n(^yu-1v'\h'\\n(^lu+3n'\L'\\n(^tu+1v-\\n(^yu'\l'|0u-1.5n\(ul'
+.\}
+.\}
+.fi
+.br
+.nr ^b 0
+..
+.\"	# VS - start vertical sidebar
+.\"	# ^Y = starting y location
+.\"	# ^v = 1 (for troff;  for nroff this doesn't matter)
+.de VS
+.if !"\\$2"" .br
+.mk ^Y
+.ie n 'mc \s12\(br\s0
+.el .nr ^v 1u
+..
+.\"	# VE - end of vertical sidebar
+.de VE
+.ie n 'mc
+.el \{\
+.ev 2
+.nf
+.ti 0
+.mk ^t
+\h'|\\n(^lu+3n'\L'|\\n(^Yu-1v\(bv'\v'\\n(^tu+1v-\\n(^Yu'\h'-|\\n(^lu+3n'
+.sp -1
+.fi
+.ev
+.\}
+.nr ^v 0
+..
+.\"	# Special macro to handle page bottom:  finish off current
+.\"	# box/sidebar if in box/sidebar mode, then invoked standard
+.\"	# page bottom macro.
+.de ^B
+.ev 2
+'ti 0
+'nf
+.mk ^t
+.if \\n(^b \{\
+.\"	Draw three-sided box if this is the box's first page,
+.\"	draw two sides but no top otherwise.
+.ie !\\n(^b-1 \h'-1.5n'\L'|\\n(^yu-1v'\l'\\n(^lu+3n\(ul'\L'\\n(^tu+1v-\\n(^yu'\h'|0u'\c
+.el \h'-1.5n'\L'|\\n(^yu-1v'\h'\\n(^lu+3n'\L'\\n(^tu+1v-\\n(^yu'\h'|0u'\c
+.\}
+.if \\n(^v \{\
+.nr ^x \\n(^tu+1v-\\n(^Yu
+\kx\h'-\\nxu'\h'|\\n(^lu+3n'\ky\L'-\\n(^xu'\v'\\n(^xu'\h'|0u'\c
+.\}
+.bp
+'fi
+.ev
+.if \\n(^b \{\
+.mk ^y
+.nr ^b 2
+.\}
+.if \\n(^v \{\
+.mk ^Y
+.\}
+..
+.\"	# DS - begin display
+.de DS
+.RS
+.nf
+.sp
+..
+.\"	# DE - end display
+.de DE
+.fi
+.RE
+.sp
+..
+.\"	# SO - start of list of standard options
+.de SO
+'ie '\\$1'' .ds So \\fBoptions\\fR
+'el .ds So \\fB\\$1\\fR
+.SH "STANDARD OPTIONS"
+.LP
+.nf
+.ta 5.5c 11c
+.ft B
+..
+.\"	# SE - end of list of standard options
+.de SE
+.fi
+.ft R
+.LP
+See the \\*(So manual entry for details on the standard options.
+..
+.\"	# OP - start of full description for a single option
+.de OP
+.LP
+.nf
+.ta 4c
+Command-Line Name:	\\fB\\$1\\fR
+Database Name:	\\fB\\$2\\fR
+Database Class:	\\fB\\$3\\fR
+.fi
+.IP
+..
+.\"	# CS - begin code excerpt
+.de CS
+.RS
+.nf
+.ta .25i .5i .75i 1i
+..
+.\"	# CE - end code excerpt
+.de CE
+.fi
+.RE
+..
+.\"	# UL - underline word
+.de UL
+\\$1\l'|0\(ul'\\$2
+..
+.\"	# QW - apply quotation marks to word
+.de QW
+.ie '\\*(lq'"' ``\\$1''\\$2
+.\"" fix emacs highlighting
+.el \\*(lq\\$1\\*(rq\\$2
+..
+.\"	# PQ - apply parens and quotation marks to word
+.de PQ
+.ie '\\*(lq'"' (``\\$1''\\$2)\\$3
+.\"" fix emacs highlighting
+.el (\\*(lq\\$1\\*(rq\\$2)\\$3
+..
+.\"	# QR - quoted range
+.de QR
+.ie '\\*(lq'"' ``\\$1''\\-``\\$2''\\$3
+.\"" fix emacs highlighting
+.el \\*(lq\\$1\\*(rq\\-\\*(lq\\$2\\*(rq\\$3
+..
+.\"	# MT - "empty" string
+.de MT
+.QW ""
+..
+.BS
+.SH NAME
+tlschan \- TLS 1\&.2 and 1\&.3 channels on wolfSSL, rustls, Mbed TLS or OpenSSL
+.SH SYNOPSIS
+package require \fBTcl 9\&.0\fR
+.sp
+package require \fBtlschan ?0\&.1?\fR
+.sp
+package require \fBtlschan::wolfssl ?0\&.1?\fR
+.sp
+package require \fBtlschan::rustls ?0\&.1?\fR
+.sp
+package require \fBtlschan::mbedtls ?0\&.1?\fR
+.sp
+package require \fBtlschan::openssl ?0\&.1?\fR
+.sp
+\fBtlschan::socket\fR ?\fIoption value \&.\&.\&.\fR? \fIhost\fR \fIport\fR
+.sp
+\fBtlschan::socket\fR \fB-server\fR \fIcommand\fR ?\fIoption value \&.\&.\&.\fR? \fIport\fR
+.sp
+\fBtlschan::import\fR \fIchannel\fR ?\fIoption value \&.\&.\&.\fR?
+.sp
+\fBtlschan::starttls\fR \fIchannel\fR ?\fIoption value \&.\&.\&.\fR?
+.sp
+\fBtlschan::unimport\fR \fIchannel\fR
+.sp
+\fBtlschan::unstack\fR \fIchannel\fR
+.sp
+\fBtlschan::handshake\fR \fIchannel\fR
+.sp
+\fBtlschan::status\fR ?\fB-local\fR? \fIchannel\fR
+.sp
+\fBtlschan::connection\fR \fIchannel\fR
+.sp
+\fBtlschan::init\fR ?\fIoption value \&.\&.\&.\fR?
+.sp
+\fBtlschan::ciphers\fR ?\fIprotocol\fR? ?\fIverbose\fR? ?\fIsupported\fR?
+.sp
+\fBtlschan::protocols\fR
+.sp
+\fBtlschan::version\fR
+.sp
+\fBtlschan::exporter\fR \fIchannel\fR \fIlabel\fR \fIlength\fR ?\fIcontext\fR?
+.sp
+\fBtlschan::randombytes\fR \fIcount\fR
+.sp
+\fBtlschan::aesgcm-encrypt\fR \fIkey\fR \fIplaintext\fR
+.sp
+\fBtlschan::aesgcm-decrypt\fR \fIkey\fR \fIdata\fR
+.sp
+\fBtlschan::pbkdf2\fR \fIdigest\fR \fIpassword\fR \fIsalt\fR \fIiterations\fR \fIlength\fR
+.sp
+\fBtlschan::pkgconfig\fR \fBlist\fR
+.sp
+\fBtlschan::pkgconfig\fR \fBget\fR \fIkey\fR
+.sp
+\fBtlschan::backend\fR
+.sp
+.BE
+.SH DESCRIPTION
+These packages add TLS to Tcl channels by stacking a TLS layer on a socket
+or any other bidirectional channel\&. Four backend packages share one channel
+layer and one command set and differ only in the TLS library underneath:
+.TP
+\fBtlschan::wolfssl\fR
+wolfSSL\&.
+.TP
+\fBtlschan::rustls\fR
+rustls with the ring crypto provider\&.
+.TP
+\fBtlschan::mbedtls\fR
+Mbed TLS 3\&.6\&.
+.TP
+\fBtlschan::openssl\fR
+OpenSSL 3\&.
+.PP
+Normally a program loads \fBtlschan\fR, which loads one backend and
+makes its commands \fB::tlschan::\fR\fIname\fR\&. This page writes the
+commands that way\&. Each backend package also defines them in the namespace
+of its own name, such as \fB::tlschan::wolfssl\fR, with the same
+syntax; requiring a backend directly pins it\&. Several backends can be loaded
+into one interpreter, together with tcltls (package \fBtls\fR)\&.
+.PP
+\fBtlschan\fR takes the backends in the order given by the variable
+\fB::tlschan::prefer\fR, set before loading it, else by the environment
+variable \fBTLSCHAN_BACKEND\fR, else \fBopenssl rustls mbedtls wolfssl\fR\&.
+The first of them already loaded is chosen, else the first that loads\&. If
+none does, \fBpackage require tlschan\fR raises
+\fBno TLS backend available (tried openssl, rustls, mbedtls, wolfssl)\fR
+with errorCode \fBTLS BACKEND\fR\&.
+.CS
+
+
+namespace eval tlschan {variable prefer {mbedtls openssl}}
+package require tlschan
+
+.CE
+.PP
+Unless the command \fB::tls::socket\fR exists already, \fBtlschan\fR
+also creates aliases \fB::tls::\fR\fIname\fR for the chosen backend's
+commands, so that code written for tcltls runs unchanged\&. A tcltls loaded
+afterwards replaces them\&. A backend package by itself never touches
+\fB::tls\fR\&. See \fBCOMPATIBILITY\fR for differences from tcltls
+and tclmtls\&.
+.PP
+Only TLS 1\&.2 and TLS 1\&.3 are implemented\&. By default a client opened with
+\fBtlschan::socket\fR verifies the server's certificate chain against the
+system trust store and checks that the certificate matches the host name it
+connected to\&.
+.SH COMMANDS
+.TP
+\fBtlschan::socket\fR ?\fIoption value \&.\&.\&.\fR? \fIhost\fR \fIport\fR
+Opens a TCP connection with \fB::socket\fR and stacks TLS on it with
+\fBtlschan::import\fR\&. Returns the channel name\&. \fB-async\fR (which
+takes no value), \fB-myaddr\fR and \fB-myport\fR go to \fB::socket\fR\&.
+\fB-autoservername\fR \fIbool\fR, default \fB1\fR, sets
+\fB-servername\fR to \fIhost\fR when it is not given\&. All other options,
+after the defaults set with \fBtlschan::init\fR, go to
+\fBtlschan::import\fR; see \fBOPTIONS\fR\&.
+.sp
+Errors from \fB::socket\fR (for example \fBcouldn't open socket: connection refused\fR)
+and from \fBtlschan::import\fR are raised unchanged; when the import
+fails the socket is closed\&. The handshake is not part of this command: it
+runs on first use of the channel, see \fBCHANNEL BEHAVIOUR\fR\&. With
+\fB-async\fR, a failed connect is reported there, as in
+\fBhandshake failed: connection refused\fR\&.
+.TP
+\fBtlschan::socket\fR \fB-server\fR \fIcommand\fR ?\fIoption value \&.\&.\&.\fR? \fIport\fR
+Opens a listening socket with \fB::socket -server\fR and returns it\&.
+\fB-myaddr\fR, \fB-reuseaddr\fR and \fB-reuseport\fR are passed to
+\fB::socket\fR; \fB-backlog\fR is not supported\&. Every accepted
+connection is imported with \fB-server\fR \fB1\fR,
+\fB-model\fR set to the listening socket, and the other options, then
+\fIcommand\fR is called with the channel, the client address and the client
+port appended, as for \fB::socket -server\fR\&.
+.sp
+So all accepted connections share one configuration, and with it one
+session ticket key (see \fBSESSION RESUMPTION\fR): the first
+connection reads the files and evaluates the \fB-password\fR script, and
+later ones reuse the result\&. An import error (an unreadable
+\fB-certfile\fR, for example) closes that connection, is reported
+through \fBbgerror\fR, and \fIcommand\fR is not called; the next connection
+tries again\&. A \fB-model\fR given here replaces the listening socket\&.
+.TP
+\fBtlschan::import\fR \fIchannel\fR ?\fIoption value \&.\&.\&.\fR?
+.TP
+\fBtlschan::starttls\fR \fIchannel\fR ?\fIoption value \&.\&.\&.\fR?
+Stacks a TLS layer on \fIchannel\fR and returns the channel name, which is
+unchanged\&. \fIchannel\fR can be any channel open for reading and writing\&.
+No data is exchanged until the handshake starts, see
+\fBCHANNEL BEHAVIOUR\fR\&. The options are described in
+\fBOPTIONS\fR\&. \fBstarttls\fR is another name for \fBimport\fR\&.
+.sp
+Options are checked and files loaded here: a bad option, file or password
+raises an error from this command and leaves the channel as it was\&.
+.TP
+\fBtlschan::unimport\fR \fIchannel\fR
+.TP
+\fBtlschan::unstack\fR \fIchannel\fR
+Sends a close_notify alert if the handshake has completed, writes out
+pending TLS data and removes the TLS layer\&. The channel stays open and
+carries plain data from then on\&. Raises
+\fBbad channel "chan": not a TLS channel\fR (errorCode
+\fBTLS CHANNEL\fR) if the topmost layer of \fIchannel\fR is not TLS\&.
+\fBunstack\fR is another name for \fBunimport\fR\&.
+.TP
+\fBtlschan::handshake\fR \fIchannel\fR
+Advances the handshake\&. Returns \fB1\fR once the handshake has completed
+and \fB0\fR if it is still in progress, which happens in nonblocking
+mode and inside the channel's \fB-validatecommand\fR; otherwise the
+command waits for the handshake to finish\&.
+If the handshake failed, raises its error message, such as
+\fBhandshake failed: certificate verify failed: certificate has expired\fR,
+with errorCode \fBTLS HANDSHAKE\fR\&. A
+failed channel raises the same error on every later call\&.
+.TP
+\fBtlschan::status\fR ?\fB-local\fR? \fIchannel\fR
+Returns a dictionary describing the session and the peer's certificate, or
+with \fB-local\fR the local certificate\&. The dictionary is empty until
+the handshake has completed, and stays empty if it failed\&. The certificate
+keys are missing when there is no such certificate, for example on a server
+whose client sent none\&. Session keys:
+.RS
+.TP
+\fBprotocol\fR \fIstring\fR
+\fBTLSv1\&.2\fR or \fBTLSv1\&.3\fR, as in tcltls\&.
+.TP
+\fBcipher\fR \fIname\fR
+IANA name of the cipher suite, such as \fBTLS_AES_256_GCM_SHA384\fR\&.
+.TP
+\fBsbits\fR \fIn\fR
+Key size of the symmetric cipher in bits: \fB128\fR or \fB256\fR\&.
+.TP
+\fBalpn\fR \fIprotocol\fR
+The protocol agreed through ALPN, or an empty string\&.
+.TP
+\fBservername\fR \fIname\fR
+On a client the \fB-servername\fR in use; on a server the name the
+client sent in the SNI extension\&. Empty if there is none\&.
+.RE
+.IP
+The certificate keys are the same as in the \fIcert\fR argument of the
+\fB-validatecommand\fR callback:
+.RS
+.TP
+\fBcertificate\fR \fIpem\fR
+The certificate in PEM format\&.
+.TP
+\fBsha1_hash\fR \fIhex\fR
+.TP
+\fBsha256_hash\fR \fIhex\fR
+SHA-1 and SHA-256 digest of the DER certificate, in upper case hex\&.
+.TP
+\fBsubject\fR \fIdn\fR
+.TP
+\fBissuer\fR \fIdn\fR
+Distinguished names in RFC 2253 form, most significant part last, as in
+\fBCN=localhost,O=Example,C=US\fR\&. Special characters are escaped with a
+backslash; attributes of unknown type appear as \fIoid\fR\fB=#\fR\fIhex\fR\&.
+.TP
+\fBserialNumber\fR \fIhex\fR
+.TP
+\fBserial\fR \fIhex\fR
+The serial number in upper case hex without leading zeros, preceded by
+\fB-\fR if negative\&. \fBserial\fR is the tcltls 1\&.7 name\&.
+.TP
+\fBversion\fR \fIn\fR
+Certificate version, normally \fB3\fR\&.
+.TP
+\fBsignatureAlgorithm\fR \fIname\fR
+.TP
+\fBsignature\fR \fIname\fR
+Signature algorithm of the certificate (outer and inner field), such as
+\fBsha256WithRSAEncryption\fR or \fBecdsa-with-SHA256\fR; unknown
+algorithms appear as dotted OIDs\&.
+.TP
+\fBnotBefore\fR \fItime\fR
+.TP
+\fBnotAfter\fR \fItime\fR
+Validity period as \fBOct 15 08:03:54 2026 GMT\fR; the day of the
+month is padded to two characters with a space\&.
+.TP
+\fBself_signed\fR \fIbool\fR
+Whether issuer and subject are the same name\&.
+.TP
+\fBpublicKeyAlgorithm\fR \fIname\fR
+Such as \fBrsaEncryption\fR, \fBid-ecPublicKey\fR or \fBED25519\fR\&.
+.TP
+\fBbits\fR \fIn\fR
+Size of the public key: the RSA modulus length, or the curve size for
+elliptic curve keys (\fB256\fR for P-256)\&. Missing if unknown\&.
+.TP
+\fBextensions\fR \fIlist\fR
+Names of the certificate's extensions in certificate order, dotted OIDs
+for unknown ones\&.
+.TP
+\fBnum_extensions\fR \fIn\fR
+Length of that list\&.
+.TP
+\fBsubjectAltName\fR \fIlist\fR
+Subject alternative names, each as \fBDNS:\fR\fIname\fR,
+\fBIP Address:\fR\fIaddress\fR, \fBemail:\fR\fIaddress\fR,
+\fBURI:\fR\fIuri\fR, \fBDirName:\fR\fI/name\fR or
+\fBRegistered ID:\fR\fIoid\fR\&. IPv6 addresses are written as eight
+colon separated hex groups\&. Missing without the extension\&.
+.TP
+\fBsubjectKeyIdentifier\fR \fIhex\fR
+.TP
+\fBauthorityKeyIdentifier\fR \fIhex\fR
+Key identifiers in upper case hex\&. Missing without the extension\&.
+.TP
+\fBocsp\fR \fIlist\fR
+OCSP responder URLs from the authority information access extension\&.
+Missing if there are none\&.
+.TP
+\fBca\fR \fIbool\fR
+The CA flag of the basic constraints extension; \fB0\fR without it\&.
+.RE
+.TP
+\fBtlschan::connection\fR \fIchannel\fR
+Returns a dictionary with the state of the connection, available at any
+time:
+.RS
+.TP
+\fBstate\fR \fIstate\fR
+\fBhandshake\fR, \fBopen\fR or \fBfailed\fR\&.
+.TP
+\fBis_server\fR \fIbool\fR
+Whether the channel is the server side\&.
+.TP
+\fBservername\fR \fIname\fR
+As in \fBstatus\fR; before the handshake has completed, the
+\fB-servername\fR given\&. Absent when the state is \fBfailed\fR\&.
+.TP
+\fBerror\fR \fImessage\fR
+Only when the state is \fBfailed\fR: the error message\&.
+.TP
+\fBprotocol\fR \fBcipher\fR \fBsbits\fR \fBalpn\fR
+Only when the state is \fBopen\fR: as in \fBstatus\fR\&.
+.TP
+\fBsession_reused\fR \fIbool\fR
+Only when the state is \fBopen\fR: whether the session was resumed, see
+\fBSESSION RESUMPTION\fR\&.
+.RE
+.TP
+\fBtlschan::init\fR ?\fIoption value \&.\&.\&.\fR?
+Sets the default options of \fBtlschan::socket\fR, both forms\&. Each
+call replaces the previous defaults; without arguments it removes them\&.
+\fB-model\fR, \fB-server\fR and \fB-servername\fR are dropped\&. The
+options are not checked until \fBsocket\fR uses them\&.
+\fBtlschan::import\fR does not use these defaults\&. Returns an empty
+string\&.
+.TP
+\fBtlschan::ciphers\fR ?\fIprotocol\fR? ?\fIverbose\fR? ?\fIsupported\fR?
+Returns the IANA names of the cipher suites the library offers for
+certificate based key exchange\&. \fIprotocol\fR is one of \fBssl2\fR,
+\fBssl3\fR, \fBtls1\fR, \fBtls1\&.1\fR, \fBtls1\&.2\fR or
+\fBtls1\&.3\fR; the list is empty for the first four\&. Without
+\fIprotocol\fR, suites of both TLS 1\&.2 and TLS 1\&.3 are returned\&.
+\fIverbose\fR and \fIsupported\fR are accepted for compatibility and
+ignored\&.
+.TP
+\fBtlschan::protocols\fR
+Returns the protocols that can be enabled: \fBtls1\&.2 tls1\&.3\fR\&.
+.TP
+\fBtlschan::version\fR
+Returns the name and version of the TLS library, such as
+\fBwolfSSL 5\&.9\&.4\fR, \fBrustls 0\&.23\&.46\fR,
+\fBMbed TLS 3\&.6\&.7\fR or \fBOpenSSL 3\&.6\&.5\fR\&.
+.TP
+\fBtlschan::exporter\fR \fIchannel\fR \fIlabel\fR \fIlength\fR ?\fIcontext\fR?
+Returns \fIlength\fR bytes of keying material exported from the session as
+defined by RFC 5705 (TLS 1\&.2) and RFC 8446 section 7\&.5 (TLS 1\&.3)\&.
+\fIlength\fR is 1 to 8160; \fIcontext\fR is a byte string\&. With TLS 1\&.2
+leaving out \fIcontext\fR gives a different result from an empty one; with
+TLS 1\&.3 the two are the same\&. Errors:
+\fBthe TLS handshake has not completed\fR (errorCode
+\fBTLS WRONGSTATE\fR), \fBlength must be between 1 and 8160\fR
+(\fBTLS WRONGARGS\fR) and \fBkeying material export failed\fR
+(\fBTLS EXPORT\fR)\&.
+.TP
+\fBtlschan::randombytes\fR \fIcount\fR
+Returns \fIcount\fR bytes, 0 to 1048576, from the library's random number
+generator\&.
+.TP
+\fBtlschan::aesgcm-encrypt\fR \fIkey\fR \fIplaintext\fR
+Encrypts \fIplaintext\fR with AES-256-GCM, without associated data\&.
+\fIkey\fR must be 32 bytes\&. Returns a fresh random 12 byte nonce, the
+ciphertext and the 16 byte tag, concatenated: 28 bytes more than
+\fIplaintext\fR\&.
+.TP
+\fBtlschan::aesgcm-decrypt\fR \fIkey\fR \fIdata\fR
+Reverses \fBaesgcm-encrypt\fR: \fIdata\fR is nonce, ciphertext and tag as
+returned by it\&. Raises \fBciphertext too short\fR if \fIdata\fR has
+fewer than 28 bytes and \fBAES-GCM authentication failed\fR if the tag
+does not match\&.
+.TP
+\fBtlschan::pbkdf2\fR \fIdigest\fR \fIpassword\fR \fIsalt\fR \fIiterations\fR \fIlength\fR
+Derives \fIlength\fR bytes, 1 to 64, from \fIpassword\fR and \fIsalt\fR
+with PBKDF2 (RFC 8018)\&. \fIdigest\fR is \fBsha1\fR, \fBsha256\fR or
+\fBsha512\fR, the HMAC hash\&. \fIiterations\fR is 1 to 10000000\&.
+.sp
+The arguments and results of \fBrandombytes\fR, \fBaesgcm-encrypt\fR,
+\fBaesgcm-decrypt\fR and \fBpbkdf2\fR are byte strings; a character above
+U+00FF raises a Tcl error, so convert text with
+\fBencoding convertto utf-8\fR first\&. Their own errors have errorCode
+\fBTLS CRYPTO\fR\&.
+.TP
+\fBtlschan::pkgconfig\fR \fBlist\fR
+.TP
+\fBtlschan::pkgconfig\fR \fBget\fR \fIkey\fR
+Build information as registered with \fBTcl_RegisterConfig\fR\&. Keys:
+\fBversion\fR, the package version (\fB0\&.1\&.0\fR), and \fBbackend\fR,
+one of \fBwolfssl\fR, \fBrustls\fR, \fBmbedtls\fR or
+\fBopenssl\fR\&.
+.TP
+\fBtlschan::backend\fR
+Only in \fBtlschan\fR: returns the name of the backend it loaded, such
+as \fBopenssl\fR\&.
+.PP
+.SH OPTIONS
+These options are accepted by \fBimport\fR and \fBstarttls\fR, by
+\fBsocket\fR and by \fBinit\fR\&. Boolean values are any form Tcl accepts\&. An
+empty value counts as not given for \fB-cadir\fR, \fB-cafile\fR,
+\fB-cert\fR, \fB-certfile\fR, \fB-cipher\fR,
+\fB-ciphersuites\fR, \fB-command\fR, \fB-key\fR,
+\fB-keyfile\fR, \fB-model\fR, \fB-password\fR,
+\fB-servername\fR, \fB-validatecommand\fR and \fB-vcmd\fR\&.
+.TP
+\fB-alpn\fR \fIlist\fR
+Protocol names to negotiate with ALPN (RFC 7301), such as
+\fBh2 http/1\&.1\fR\&. Each name must be 1 to 255 bytes long, or
+\fBimport\fR raises \fBinvalid ALPN protocol name ""\fR (errorCode
+\fBTLS CONFIG\fR)\&. Which common name is chosen depends on the backend,
+see \fBBACKEND DIFFERENCES\fR\&. With none in common the handshake
+completes without ALPN\&.
+.TP
+\fB-autoservername\fR \fIbool\fR
+Only meaningful to \fBsocket\fR, see there\&. \fBimport\fR ignores it\&.
+.TP
+\fB-cadir\fR \fIdirectory\fR
+A directory of trusted CA certificates\&. The TLS library reads it directly,
+so it must be a native path, not one inside a Tcl virtual filesystem\&. The
+expected file names differ, see \fBBACKEND DIFFERENCES\fR\&.
+\fB-cadir\fR and \fB-cafile\fR can be combined\&.
+.TP
+\fB-cafile\fR \fIfile\fR
+Trusted CA certificates: a PEM file with any number of them, or one DER
+certificate\&. The file is read through Tcl's filesystem, so it can be inside
+zipfs or another virtual filesystem\&.
+.sp
+Without \fB-cafile\fR and \fB-cadir\fR the system trust store is
+used, read when first needed\&. Where it comes from depends on the backend,
+see \fBBACKEND DIFFERENCES\fR\&.
+.TP
+\fB-cert\fR \fIdata\fR
+The local certificate as data: PEM text, which may hold the leaf certificate
+followed by intermediates to be sent along, or a single DER certificate\&.
+Takes precedence over \fB-certfile\fR\&.
+.TP
+\fB-certfile\fR \fIfile\fR
+As \fB-cert\fR, read from a file through Tcl's filesystem\&.
+.TP
+\fB-cipher\fR \fIlist\fR
+The TLS 1\&.2 cipher suites to enable, replacing the default ones\&. The list
+holds suite names separated by colons, commas or white space: IANA names
+as \fBciphers\fR returns them
+(\fBTLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256\fR), the same with
+\fB-\fR for \fB_\fR, OpenSSL names
+(\fBECDHE-ECDSA-AES128-GCM-SHA256\fR) or the library's own names, in any
+letter case\&. OpenSSL cipher string syntax (\fBHIGH\fR, \fB!aNULL\fR,
+\fB@STRENGTH\fR) is not supported\&. An unknown name raises
+\fBunknown cipher: \fR\fIname\fR (errorCode \fBTLS CONFIG\fR)\&.
+.TP
+\fB-ciphersuites\fR \fIlist\fR
+The TLS 1\&.3 cipher suites to enable, replacing the default ones, in the
+same form, such as \fBTLS_CHACHA20_POLY1305_SHA256\fR\&.
+.sp
+Names of either protocol may appear in either option: each name is sorted
+to its protocol, and the names a protocol receives replace its defaults\&. A
+protocol that receives no names keeps its defaults, unless its own option
+was given: \fB-cipher\fR without a TLS 1\&.2 name disables TLS 1\&.2, and
+\fB-ciphersuites\fR without a TLS 1\&.3 name disables TLS 1\&.3\&. If that
+leaves no protocol, \fBimport\fR raises \fBno usable cipher suites\fR
+(errorCode \fBTLS CONFIG\fR)\&.
+.TP
+\fB-command\fR \fIprefix\fR
+A command prefix invoked on handshake completion and on failure, see
+\fBCALLBACKS\fR\&.
+.TP
+\fB-key\fR \fIdata\fR
+The private key as data, PEM or DER: PKCS#8, PKCS#1 (RSA) or SEC1 (EC)\&.
+Takes precedence over \fB-keyfile\fR\&. A certificate and a key must be
+given together, and they must match\&.
+.TP
+\fB-keyfile\fR \fIfile\fR
+As \fB-key\fR, read from a file through Tcl's filesystem\&. Defaults to
+the \fB-certfile\fR, so one PEM file can hold both\&.
+.sp
+An encrypted key needs \fB-password\fR\&. PKCS#8 keys encrypted with
+PBES2, as written by \fBopenssl pkcs8 -topk8 -v2 aes-256-cbc\fR, work
+with every backend, in PEM and DER form\&. Other formats depend on the
+backend, see \fBBACKEND DIFFERENCES\fR\&.
+.TP
+\fB-model\fR \fIchannel\fR
+Use a shared configuration: certificates, keys, password, trust,
+protocols, cipher suites, ALPN, \fB-request\fR and \fB-require\fR
+come from it, and options of this call that configure them are ignored\&.
+\fB-servername\fR, \fB-command\fR and \fB-validatecommand\fR
+still apply\&. \fIchannel\fR can be any channel\&. A TLS channel lends its own
+configuration\&. Any other channel anchors one: the first import naming it
+creates the configuration from its options, later imports share it, and it
+is released when \fIchannel\fR is closed; channels using it keep it\&.
+\fB-server\fR must match the configuration, or \fBimport\fR raises
+\fB-model \fR\fIchannel\fR\fB is configured as a client\fR (or
+\fBserver\fR), errorCode \fBTLS MODEL\fR\&. Sharing a configuration
+saves loading files again and is needed for session resumption, see
+\fBSESSION RESUMPTION\fR\&.
+.TP
+\fB-password\fR \fIscript\fR
+A script whose result is the password of the private key; the script may
+also end with \fBreturn\fR \fIpassword\fR\&. It is evaluated at global
+level, once, by the \fBimport\fR that creates a configuration with a key,
+whether or not the key is encrypted\&. An error in the script is raised by
+\fBimport\fR\&.
+.TP
+\fB-request\fR \fIbool\fR
+On a server, ask the client for a certificate\&. Default \fB0\fR\&. A
+certificate the client sends is then available through \fBstatus\fR
+whether or not it verifies, unless \fB-require\fR is set\&. No effect on a
+client\&.
+.TP
+\fB-require\fR \fIbool\fR
+On a client, verify the server's certificate chain and host name and fail
+the handshake if they do not verify\&. Default \fB1\fR\&. With \fB0\fR, no
+verification is done, unless \fB-validatecommand\fR is given\&.
+.sp
+On a server, require a client certificate that verifies against
+\fB-cafile\fR, \fB-cadir\fR or the system store; implies
+\fB-request\fR\&. Default \fB0\fR\&.
+.TP
+\fB-server\fR \fIbool\fR
+Act as the server side\&. Default \fB0\fR\&. A server needs a certificate and
+a private key, or \fBimport\fR raises an error\&.
+.TP
+\fB-servername\fR \fIname\fR
+On a client, the name sent in the SNI extension and the name the server's
+certificate must match\&. An IP address is matched against the certificate's
+IP address entries and is not sent as SNI\&. Without \fB-servername\fR no
+SNI is sent and only the chain is verified, not the name; unlike
+\fBsocket\fR, \fBimport\fR does not set it\&. A value that is neither a host name
+nor an IP address raises \fBinvalid server name "\fR\fIname\fR\fB"\fR
+(errorCode \fBTLS CONFIG\fR)\&. Servers ignore this option\&.
+.TP
+\fB-ssl2\fR \fIbool\fR
+.TP
+\fB-ssl3\fR \fIbool\fR
+.TP
+\fB-tls1\fR \fIbool\fR
+.TP
+\fB-tls1\&.1\fR \fIbool\fR
+.TP
+\fB-castore\fR \fIuri\fR
+.TP
+\fB-dhparams\fR \fIfile\fR
+.TP
+\fB-post_handshake\fR \fIbool\fR
+.TP
+\fB-security_level\fR \fIn\fR
+.TP
+\fB-session_id\fR \fIdata\fR
+Accepted for tcltls compatibility and ignored; the old protocols are never
+enabled\&.
+.TP
+\fB-tls1\&.2\fR \fIbool\fR
+.TP
+\fB-tls1\&.3\fR \fIbool\fR
+Enable TLS 1\&.2 or TLS 1\&.3\&. Both default to \fB1\fR\&. Disabling both
+raises \fBno protocols enabled\fR (errorCode \fBTLS PROTOCOL\fR)\&.
+.TP
+\fB-validatecommand\fR \fIprefix\fR
+.TP
+\fB-vcmd\fR \fIprefix\fR
+A command prefix that decides on each certificate the peer sends, see
+\fBCALLBACKS\fR\&. A channel with this callback never resumes a session\&.
+.PP
+.SH CALLBACKS
+\fB-command\fR and \fB-validatecommand\fR are command prefixes: the
+arguments below are appended and the command is evaluated at global level\&.
+They can run inside any command that does I/O on the channel, or from the
+event loop when the channel is nonblocking\&. An error in a callback is
+reported through \fBbgerror\fR (see \fBinterp bgerror\fR); it does not
+become the result of the command that triggered the callback\&.
+.TP
+\fIprefix\fR \fBinfo\fR \fIchannel\fR \fBhandshake\fR \fBdone\fR \fB{SSL negotiation finished successfully}\fR \fBinfo\fR
+\fB-command\fR, once, when the handshake has completed\&.
+.TP
+\fIprefix\fR \fBerror\fR \fIchannel\fR \fImessage\fR
+\fB-command\fR, once, when the channel fails, during the handshake or
+later\&. \fImessage\fR is the error that I/O on the channel raises from then
+on\&.
+.TP
+\fIprefix\fR \fBverify\fR \fIchannel\fR \fIdepth\fR \fIcert\fR \fIok\fR \fIerror\fR
+\fB-validatecommand\fR, during the handshake, for each certificate the
+peer sent, from the highest \fIdepth\fR down to \fB0\fR, the peer's own
+certificate\&. Certificates taken from the local trust store are not
+reported\&. \fIcert\fR is a dictionary with the certificate keys of
+\fBstatus\fR\&. \fIok\fR is \fB1\fR if the library accepts this
+certificate and \fB0\fR if not; \fIerror\fR then gives the reason, such
+as \fBcertificate has expired\fR, \fBhostname mismatch\fR or
+\fBissuer certificate not trusted\fR for a certificate signed by a
+rejected one, and is empty otherwise\&.
+.sp
+A result that is a true boolean or a nonzero integer accepts the
+certificate\&. Anything else, or an error, rejects it, and the handshake
+fails with \fBhandshake failed: certificate rejected by validation callback\fR\&.
+The result replaces the library's verdict whatever \fB-require\fR says:
+the callback can accept an expired or untrusted certificate or a name
+mismatch, and can reject a valid one\&. A client calls it whenever it is
+given; a server only with \fB-request\fR or \fB-require\fR, when
+the client sends a certificate\&.
+.sp
+The callback may use its channel, but the handshake is still in progress:
+\fBhandshake\fR returns \fB0\fR, reads return nothing, and what it
+writes is sent once the handshake has completed\&.
+.PP
+The \fB-password\fR script is not a prefix: it is evaluated as given,
+without arguments, see \fBOPTIONS\fR\&.
+.SH "CHANNEL BEHAVIOUR"
+.IP \(bu
+The TLS channel keeps the name of the channel below\&. It adds no channel
+options of its own: \fBchan configure\fR options other than the generic
+ones, such as \fB-peername\fR, \fB-sockname\fR or
+\fB-keepalive\fR, are those of the channel below\&.
+.IP \(bu
+The handshake starts on first use\&. On a blocking channel the first
+\fBread\fR, \fBgets\fR, \fBflush\fR or \fBtlschan::handshake\fR performs the
+whole handshake and waits for it\&. On a nonblocking channel the handshake
+proceeds from the event loop: at once if the channel was already
+nonblocking when imported, otherwise after the first read or write attempt
+or once a \fBchan event\fR handler is set\&. \fBtlschan::handshake\fR also
+advances it\&. Data written before it completes is buffered and sent
+afterwards\&. Readable and writable handlers are not called before the
+handshake has completed or failed\&.
+.IP \(bu
+A failure is final: every later \fBread\fR, \fBgets\fR, \fBputs\fR or
+\fBflush\fR raises the error, without errorCode, and a nonblocking channel
+becomes readable and writable to report it\&. During the handshake the
+message is \fBhandshake failed: \fR\fIreason\fR; afterwards
+\fBread failed: \fR\fIreason\fR, \fBwrite failed: \fR\fIreason\fR,
+\fBconnection closed\fR or an operating system message such as
+\fBconnection reset by peer\fR\&. Either way it can also be
+\fBpeer sent alert: \fR\fIdescription\fR\&. Typical handshake reasons are
+\fBcertificate verify failed: \fR\fIwhy\fR,
+\fBcertificate rejected by validation callback\fR,
+\fBpeer did not return a certificate\fR and
+\fBconnection closed during handshake\fR; \fIwhy\fR is one of
+\fBcertificate has expired\fR, \fBcertificate is not yet valid\fR,
+\fBhostname mismatch\fR, \fBself-signed certificate\fR,
+\fBunable to get local issuer certificate\fR or
+\fBissuer certificate not trusted\fR, or else the library's own words\&.
+.IP \(bu
+In TLS 1\&.3 a client's handshake completes before the server has checked
+the client certificate\&. A rejection reaches the client as an alert on its
+next read, as in \fBpeer sent alert: certificate required\fR\&.
+.IP \(bu
+The end of the stream is reported as EOF both when the peer sent a
+close_notify alert and when the connection was closed without one\&.
+.IP \(bu
+\fBclose\fR sends a close_notify alert if the handshake has completed,
+writes out pending data, blocking if needed, and closes the channel below\&.
+Tcl refuses to half-close a stacked channel: \fBclose\fR \fIchannel\fR
+\fBwrite\fR raises
+\fBhalf-close not applicable to stack of transformations\fR\&.
+.IP \(bu
+\fBfcopy\fR and \fBchan copy\fR work in both directions\&.
+.PP
+.SH "SESSION RESUMPTION"
+All backends resume sessions, in TLS 1\&.2 and TLS 1\&.3, by the same rules:
+.IP \(bu
+A server issues session tickets under a key that belongs to its
+configuration, so it resumes only sessions of connections that shared that
+configuration\&. The connections accepted by one \fBsocket -server\fR
+share one\&.
+.IP \(bu
+A client keeps the most recent session for each server name, for up to 32
+names, in its configuration, and offers it on the next connection to the
+same \fB-servername\fR that uses this configuration\&. A client therefore
+resumes only when its connections share a configuration through
+\fB-model\fR, for example one anchored on a long-lived channel:
+.CS
+
+
+set model [file tempfile]
+proc https {args} {
+    tlschan::socket -model $::model {*}$args
+}
+http::register https 443 https
+
+.CE
+.IP \(bu
+There is no resumption for a client without \fB-servername\fR, nor for
+a client or a server with \fB-validatecommand\fR, whose callback must
+see every handshake\&.
+.IP \(bu
+\fBconnection\fR reports whether a session was resumed as
+\fBsession_reused\fR\&.
+.PP
+.SH "BACKEND DIFFERENCES"
+The backends behave alike except for the following, observed with
+wolfSSL 5\&.9\&.4, rustls 0\&.23\&.46, Mbed TLS 3\&.6\&.7 and OpenSSL 3\&.6\&.5\&.
+.TP
+Cipher suites
+\fBtlschan::wolfssl\fR and \fBtlschan::rustls\fR have 3 TLS 1\&.3
+suites and 6 TLS 1\&.2 suites, all ECDHE with AES-GCM or ChaCha20-Poly1305\&.
+\fBtlschan::mbedtls\fR and \fBtlschan::openssl\fR add the CCM suites
+to TLS 1\&.3 and offer many more TLS 1\&.2 suites (103 and 59 in the builds
+above), including CBC, ARIA, Camellia, DHE and RSA key exchange; their lists
+depend on how the library was built\&.
+.TP
+ALPN choice
+\fBtlschan::wolfssl\fR chooses the first of the client's protocols that
+the server also lists; the others choose the first of the server's protocols
+that the client offers\&.
+.TP
+\fB-cadir\fR
+\fBtlschan::wolfssl\fR and \fBtlschan::mbedtls\fR load every
+certificate file in the directory\&. \fBtlschan::rustls\fR loads files
+named "\fI*\&.pem\fR", "\fI*\&.crt\fR" or like an OpenSSL hash link
+("\fI1a2b3c4d\&.0\fR")\&. \fBtlschan::openssl\fR needs an OpenSSL hashed
+directory (see \fBopenssl rehash\fR) and finds only certificates under
+their hash names\&.
+.TP
+Trust anchors
+\fBtlschan::openssl\fR also accepts a certificate that is not a CA,
+given in \fB-cafile\fR, as a trust anchor; the others do not\&.
+.TP
+System trust store
+\fBtlschan::wolfssl\fR uses the Windows or macOS store, elsewhere the
+certificates in "\fI/etc/ssl/certs\fR",
+"\fI/etc/pki/ca-trust/source/anchors\fR" and "\fI/etc/pki/tls/certs\fR", or if
+none exists the bundle "\fI/etc/ssl/cert\&.pem\fR" (on Haiku
+"\fI/boot/system/data/ssl/CARootCertificates\&.pem\fR"); it ignores
+\fBSSL_CERT_FILE\fR and \fBSSL_CERT_DIR\fR\&. \fBtlschan::rustls\fR uses
+rustls-native-certs, which honours \fBSSL_CERT_FILE\fR and
+\fBSSL_CERT_DIR\fR, and falls back to Mozilla's root list when the system
+has none\&. \fBtlschan::mbedtls\fR reads \fBSSL_CERT_FILE\fR and
+\fBSSL_CERT_DIR\fR if set, else the first CA bundle found at the usual
+places, else "\fI/etc/ssl/certs\fR"; on Windows it uses the Windows
+certificate store, on macOS the keychain's trust settings\&.
+\fBtlschan::openssl\fR uses OpenSSL's default locations, which honour
+\fBSSL_CERT_FILE\fR and \fBSSL_CERT_DIR\fR, then the usual bundle files, and
+on Windows with OpenSSL 3\&.2 or later the Windows store\&.
+.TP
+Encrypted keys
+Legacy encrypted PEM keys (\fBProc-Type: 4,ENCRYPTED\fR) and PKCS#8 keys
+encrypted with PBES1, such as PBE-SHA1-3DES, work only with
+\fBtlschan::mbedtls\fR and \fBtlschan::openssl\fR;
+\fBtlschan::wolfssl\fR reports \fBunsupported key encryption\fR for
+them\&.
+.TP
+Refused client certificates
+The alert a server sends when it refuses a client certificate is the
+library's\&. For a missing certificate it is \fBcertificate required\fR in
+TLS 1\&.3; in TLS 1\&.2 \fBtlschan::wolfssl\fR and
+\fBtlschan::openssl\fR send \fBhandshake failure\fR,
+\fBtlschan::rustls\fR \fBcertificate required\fR, and
+\fBtlschan::mbedtls\fR closes the connection without an alert, so the
+client reports \fBconnection closed during handshake\fR\&. For an
+untrusted certificate it is \fBunknown CA\fR, from
+\fBtlschan::rustls\fR \fBcertificate unknown\fR\&. A
+\fBtlschan::mbedtls\fR server in TLS 1\&.3 encrypts the alert with keys
+the client no longer reads with, so the client's next read fails with a MAC
+error instead (an Mbed TLS bug); the server still refuses\&.
+.TP
+Received alerts
+\fBtlschan::mbedtls\fR reports a received alert as
+\fBpeer sent alert\fR without its name: Mbed TLS 3\&.6 doesn't say which
+one arrived\&.
+.PP
+.SH COMPATIBILITY
+.SS TCLTLS
+Code written for tcltls 2 mostly runs unchanged through the
+\fB::tls\fR aliases of \fBtlschan\fR, or with \fB::tls\fR replaced
+by \fB::tlschan\fR or a backend's namespace\&. The differences:
+.IP \(bu
+Not provided: \fBtls::shutdown\fR, \fBtls::misc\fR, \fBtls::build-info\fR,
+the sample callbacks \fBtls::callback\fR, \fBtls::password\fR and
+\fBtls::validate_command\fR, and \fBtls::debug\fR\&. Added:
+\fBexporter\fR, \fBrandombytes\fR, \fBaesgcm-encrypt\fR,
+\fBaesgcm-decrypt\fR and \fBpbkdf2\fR\&.
+.IP \(bu
+\fBstatus\fR: \fBcipher\fR is an IANA name,
+also for TLS 1\&.2, where tcltls uses OpenSSL names; digests are upper case
+hex; \fBbits\fR is the key size, not its security strength\&. tcltls keys
+not listed under \fBstatus\fR, such as \fBpeername\fR,
+\fBverifyResult\fR, \fBkeyUsage\fR or \fBall\fR, are absent;
+\fBself_signed\fR, \fBca\fR, \fBnum_extensions\fR and \fBocsp\fR
+correspond to tcltls's \fBselfSigned\fR, \fBbasicConstraintsCA\fR,
+\fBextCount\fR and \fBocspResponders\fR\&.
+.IP \(bu
+\fBconnection\fR: \fBstate\fR is \fBhandshake\fR, \fBopen\fR or
+\fBfailed\fR, not an OpenSSL state string, and only the keys listed
+there exist\&.
+.IP \(bu
+\fBciphers\fR returns IANA names and ignores \fIverbose\fR and
+\fIsupported\fR\&.
+.IP \(bu
+\fB-command\fR reports only \fBinfo\fR (handshake completion) and
+\fBerror\fR; there are no \fBmessage\fR and \fBsession\fR calls\&.
+.IP \(bu
+\fB-validatecommand\fR is called only with \fBverify\fR, not with
+\fBalpn\fR, \fBhello\fR or \fBsni\fR\&. Any true result accepts; tcltls
+treats \fB2\fR as rejecting without aborting\&. Certificates from the local
+trust store are not reported\&.
+.IP \(bu
+\fB-password\fR is evaluated without arguments; tcltls appends
+\fBpassword\fR, the read/write flag and the maximum length\&.
+.IP \(bu
+\fB-cert\fR and \fB-key\fR take PEM as well as DER;
+\fB-cafile\fR, \fB-certfile\fR and \fB-keyfile\fR are read through
+Tcl's filesystem\&.
+.IP \(bu
+Options without an effect here are accepted and ignored, see
+\fBOPTIONS\fR\&.
+.IP \(bu
+errorCodes begin with \fBTLS\fR, see \fBERRORS\fR\&.
+.PP
+.SS TCLMTLS
+tclmtls is the package \fBmtls\fR with commands in \fB::mtls\fR;
+its names do not clash with these packages\&. Compared with tclmtls:
+.IP \(bu
+There is nothing like \fBmtls::debug\fR or \fBmtls::build-info\fR\&.
+.IP \(bu
+\fBtlschan::pkgconfig\fR has only the keys \fBversion\fR and
+\fBbackend\fR; tclmtls's \fBclient\fR, \fBserver\fR,
+\fIproto\fR\fB,protocol\fR and \fBversion,backend\fR,
+\fBname,backend\fR, \fBtype,backend\fR are absent\&.
+.IP \(bu
+\fBstatus\fR returns more keys, and cipher suites, there and in
+\fBciphers\fR, are IANA names (\fBTLS_AES_256_GCM_SHA384\fR) instead of
+Mbed TLS names (\fBTLS1-3-AES-256-GCM-SHA384\fR)\&.
+.IP \(bu
+errorCodes begin with \fBTLS\fR instead of \fBMTLS\fR, and errors of the
+crypto commands are just \fBTLS CRYPTO\fR, without a further element\&.
+The crypto commands take and return data in the same formats and with the
+same limits\&.
+.PP
+.SH ERRORS
+Errors raised by the commands have these errorCodes:
+.TP
+\fBTLS CONFIG\fR
+An invalid option value: unparsable certificate, key or CA file, wrong
+password, unknown cipher suite, invalid ALPN name or server name, missing
+certificate on a server\&.
+.TP
+\fBTLS PROTOCOL\fR
+No protocol enabled\&.
+.TP
+\fBTLS MODEL\fR
+The \fB-model\fR configuration is for the other side, client or server\&.
+.TP
+\fBTLS IMPORT\fR
+The session could not be set up\&.
+.TP
+\fBTLS CHANNEL\fR
+The channel is not a TLS channel\&.
+.TP
+\fBTLS HANDSHAKE\fR
+Raised by \fBhandshake\fR for a failed handshake\&.
+.TP
+\fBTLS WRONGSTATE\fR \fBTLS WRONGARGS\fR \fBTLS EXPORT\fR
+Raised by \fBexporter\fR\&.
+.TP
+\fBTLS CRYPTO\fR
+Raised by the crypto commands\&.
+.TP
+\fBTLS INIT\fR
+The library could not be initialised when loading the package\&.
+.TP
+\fBTLS BACKEND\fR
+\fBtlschan\fR found no backend to load\&.
+.PP
+Errors opening a file named in an option have a \fBPOSIX\fR errorCode;
+errors in arguments have the usual \fBTCL\fR ones\&. I/O errors on the
+channel do not set errorCode, see \fBCHANNEL BEHAVIOUR\fR\&.
+.SH "STATIC LINKING"
+Built with \fBBUILD_SHARED_LIBS=OFF\fR, each backend is an archive, such
+as "\fIlibtcl9tlschan_wolfssl0\&.1\&.0\&.a\fR", whose only global symbol is its
+initialisation function: \fBTlschan_wolfssl_Init\fR,
+\fBTlschan_rustls_Init\fR, \fBTlschan_mbedtls_Init\fR or
+\fBTlschan_openssl_Init\fR\&. The archive uses Tcl's stubs interface, so the
+application also links Tcl's stub library; the pkg-config file
+"\fItcl9tlschan_wolfssl\&.pc\fR" (and so on) names the other libraries to
+link\&. The application registers the package and declares it in each
+interpreter that is to use it:
+.CS
+
+
+Tcl_StaticLibrary(NULL, "Tlschan_wolfssl", Tlschan_wolfssl_Init, NULL);
+Tcl_EvalEx(interp,
+    "package ifneeded tlschan::wolfssl 0\&.1\&.0 {load {} Tlschan_wolfssl}", -1, 0);
+
+.CE
+Pass NULL, not an interpreter: with one, Tcl takes the package as already
+loaded there and never calls \fBTlschan_wolfssl_Init\fR\&. There is no
+safe-interpreter initialisation function\&.
+.PP
+\fBtlschan\fR is a script, installed with its "\fIpkgIndex\&.tcl\fR" in
+"\fIlib/tlschan0\&.1\&.0\fR" for static builds too\&. An application ships it in
+its script library, next to the backends it registers, and
+\fBpackage require tlschan\fR then picks among those\&. See
+"\fIREADME\&.md\fR" for building\&.
+.SH EXAMPLES
+Fetch a page over HTTPS, verifying the server against the system store:
+.CS
+
+
+package require tlschan
+package require http
+http::register https 443 ::tlschan::socket
+set tok [http::geturl https://www\&.tcl-lang\&.org/]
+puts [http::ncode $tok]
+http::cleanup $tok
+
+.CE
+An echo server, event driven:
+.CS
+
+
+package require tlschan
+
+proc accept {chan addr port} {
+    chan configure $chan -blocking 0 -buffering line
+    chan event $chan readable [list echo $chan]
+}
+
+proc echo {chan} {
+    if {[catch {gets $chan line} n]} {
+        puts stderr "$chan: $n"
+        close $chan
+    } elseif {$n >= 0} {
+        puts $chan $line
+    } elseif {[eof $chan]} {
+        close $chan
+    }
+}
+
+set opts {-certfile server\&.pem -keyfile server-key\&.pem}
+tlschan::socket -server accept {*}$opts 8443
+vwait forever
+
+.CE
+Switch an established plain connection to TLS, as after a STARTTLS
+command; \fB-servername\fR must be given explicitly:
+.CS
+
+
+package require tlschan
+set chan [socket mail\&.example\&.com 587]
+# \&.\&.\&. plain text exchange ending in STARTTLS \&.\&.\&.
+tlschan::starttls $chan -servername mail\&.example\&.com
+tlschan::handshake $chan
+
+.CE
+Accept a server only if its certificate has a known SHA-256 fingerprint,
+such as one shown by \fBopenssl x509 -noout -fingerprint -sha256\fR\&.
+This one pins the backend by requiring it directly:
+.CS
+
+
+package require tlschan::mbedtls
+
+proc pin {fingerprint op chan depth cert ok error} {
+    if {$depth > 0} {
+        return 1
+    }
+    set expected [string map {: ""} $fingerprint]
+    string equal -nocase $expected [dict get $cert sha256_hash]
+}
+
+set vcmd [list pin $fingerprint]
+set chan [tlschan::mbedtls::socket -validatecommand $vcmd device\&.local 8443]
+
+.CE
+Mutual TLS: the server requires a client certificate issued by its CA and
+greets the client by name\&.
+.CS
+
+
+package require tlschan
+
+proc accept {chan addr port} {
+    chan configure $chan -blocking 0 -buffering line
+    chan event $chan readable [list greet $chan]
+}
+
+proc greet {chan} {
+    if {[catch {gets $chan line} n] || [eof $chan]} {
+        close $chan
+    } elseif {$n >= 0} {
+        puts $chan "hello [dict get [tlschan::status $chan] subject]"
+    }
+}
+
+set opts {-certfile server\&.pem -keyfile server-key\&.pem}
+tlschan::socket -server accept -require 1 -cafile client-ca\&.pem {*}$opts 8443
+vwait forever
+
+.CE
+The client:
+.CS
+
+
+package require tlschan
+set opts {-certfile client\&.pem -keyfile client-key\&.pem}
+set chan [tlschan::socket -cafile server-ca\&.pem {*}$opts server\&.example\&.com 8443]
+chan configure $chan -buffering line
+puts $chan hi
+puts [gets $chan]
+
+.CE
+Code written for tcltls, unchanged:
+.CS
+
+
+package require tlschan
+set chan [tls::socket www\&.tcl-lang\&.org 443]
+
+.CE
+.SH "SEE ALSO"
+chan, http, socket
+.SH KEYWORDS
+ALPN, Mbed TLS, OpenSSL, SSL, TLS, X\&.509, certificate, channel, https, rustls, socket, wolfSSL
+.SH CATEGORY
+Networking

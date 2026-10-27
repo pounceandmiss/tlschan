@@ -1,0 +1,6 @@
+# Undefined behaviour inside wolfCrypt itself (unaligned word access,
+# shifts in its bignum code), reported upstream style; not ours to fix.
+alignment:*wolfcrypt/src/*
+shift-base:*wolfcrypt/src/*
+signed-integer-overflow:*wolfcrypt/src/*
+alignment:*wolfssl-src/src/internal.c

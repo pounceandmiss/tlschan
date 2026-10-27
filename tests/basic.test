@@ -1,0 +1,112 @@
+# basic.test --
+#
+#	Commands that need no connection.
+
+source [file join [file dirname [info script]] helpers.tcl]
+
+test basic-1.1 {package and pkgconfig} -body {
+    list [package present $pkg] [${T}::pkgconfig get version] \
+	[expr {[${T}::pkgconfig get backend] in {wolfssl rustls mbedtls openssl}}]
+} -result [list 0.1.0 0.1.0 1]
+
+test basic-1.2 {a backend alone leaves ::tls alone} -body {
+    exec [interpreter] << "package require $pkg; puts \[info commands ::tls::*\]"
+} -result {}
+
+test basic-2.1 {protocols} -body {
+    ${T}::protocols
+} -result {tls1.2 tls1.3}
+
+test basic-2.2 {ciphers per protocol} -body {
+    list [expr {"TLS_AES_128_GCM_SHA256" in [${T}::ciphers tls1.3]}] \
+	[expr {"TLS_AES_128_GCM_SHA256" in [${T}::ciphers tls1.2]}] \
+	[expr {[llength [${T}::ciphers tls1.2]] > 0}] \
+	[${T}::ciphers tls1] [${T}::ciphers ssl3 1 1]
+} -result {1 0 1 {} {}}
+
+test basic-2.3 {ciphers bad protocol} -body {
+    ${T}::ciphers tls9
+} -returnCodes error -match glob -result {bad protocol "tls9": must be *}
+
+test basic-2.4 {version} -body {
+    regexp {^(wolfSSL|rustls|Mbed TLS|OpenSSL) [0-9]+\.[0-9]+} [${T}::version]
+} -result 1
+
+test basic-3.1 {import arguments} -body {
+    ${T}::import
+} -returnCodes error -result "wrong # args: should be \"${T}::import channel ?-option value ...?\""
+
+test basic-3.2 {import unknown channel} -body {
+    ${T}::import nosuchchan
+} -returnCodes error -result {can not find channel named "nosuchchan"}
+
+test basic-3.3 {import bad option} -setup {
+    set f [open [info script]]
+} -body {
+    ${T}::import $f -bogus 1
+} -cleanup {
+    close $f
+} -returnCodes error -match glob -result {bad option "-bogus": must be *}
+
+test basic-3.4 {status of a plain channel} -setup {
+    set f [open [info script]]
+} -body {
+    ${T}::status $f
+} -cleanup {
+    close $f
+} -returnCodes error -match glob -result {bad channel "file*": not a TLS channel}
+
+test basic-3.5 {import, unimport before any I/O} -setup {
+    lassign [socketpair] a b
+} -body {
+    set c [${T}::import $a -require 0]
+    set before [chan configure $c -blocking]
+    ${T}::unimport $c
+    puts $a plain
+    flush $a
+    list [expr {$c eq $a}] $before [catch {${T}::status $a}] [gets $b]
+} -cleanup {
+    close $a
+    close $b
+} -result {1 1 1 plain}
+
+test basic-4.1 {randombytes} -body {
+    list [string length [${T}::randombytes 0]] \
+	[string length [${T}::randombytes 33]] \
+	[expr {[${T}::randombytes 16] ne [${T}::randombytes 16]}]
+} -result {0 33 1}
+
+test basic-4.2 {randombytes range} -body {
+    ${T}::randombytes -1
+} -returnCodes error -result {count must be between 0 and 1048576}
+
+test basic-4.3 {aesgcm roundtrip} -body {
+    set key [${T}::randombytes 32]
+    set ct [${T}::aesgcm-encrypt $key "hello world"]
+    list [string length $ct] [${T}::aesgcm-decrypt $key $ct] \
+	[${T}::aesgcm-decrypt $key [${T}::aesgcm-encrypt $key ""]]
+} -result {39 {hello world} {}}
+
+test basic-4.4 {aesgcm detects tampering} -body {
+    set key [${T}::randombytes 32]
+    set ct [${T}::aesgcm-encrypt $key "hello world"]
+    binary scan $ct cu* bytes
+    lset bytes 15 [expr {[lindex $bytes 15] ^ 1}]
+    ${T}::aesgcm-decrypt $key [binary format cu* $bytes]
+} -returnCodes error -result {AES-GCM authentication failed}
+
+test basic-4.5 {aesgcm key length} -body {
+    ${T}::aesgcm-encrypt short data
+} -returnCodes error -result {key must be 32 bytes}
+
+test basic-4.6 {pbkdf2 vectors} -body {
+    lmap {d c n} {sha1 1 20 sha1 4096 20 sha256 1 32} {
+	binary encode hex [${T}::pbkdf2 $d password salt $c $n]
+    }
+} -result {0c60c80f961f0e71f3a9b524af6012062fe037a6 4b007901b765489abead49d926f721d065a429c1 120fb6cffcf8b32c43e7225256c4f837a86548c92ccc35480805987cb70be17b}
+
+test basic-4.7 {pbkdf2 range} -body {
+    ${T}::pbkdf2 sha256 pw salt 1 65
+} -returnCodes error -result {length must be between 1 and 64}
+
+cleanupTests

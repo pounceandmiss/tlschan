@@ -1,0 +1,997 @@
+[comment {-*- tcl -*- doctools manpage}]
+[comment {To render: dtplite -o tlschan.n nroff tlschan.man
+                    dtplite -o tlschan.html html tlschan.man
+}]
+[manpage_begin tlschan n 0.1]
+[keywords TLS SSL socket channel certificate X.509 https ALPN wolfSSL rustls "Mbed TLS" OpenSSL]
+[moddesc {TLS channels for Tcl 9}]
+[titledesc {TLS 1.2 and 1.3 channels on wolfSSL, rustls, Mbed TLS or OpenSSL}]
+[category Networking]
+[require Tcl 9.0]
+[require tlschan [opt 0.1]]
+[require tlschan::wolfssl [opt 0.1]]
+[require tlschan::rustls [opt 0.1]]
+[require tlschan::mbedtls [opt 0.1]]
+[require tlschan::openssl [opt 0.1]]
+[description]
+
+These packages add TLS to Tcl channels by stacking a TLS layer on a socket
+or any other bidirectional channel. Four backend packages share one channel
+layer and one command set and differ only in the TLS library underneath:
+
+[list_begin definitions]
+[def [package tlschan::wolfssl]] wolfSSL.
+[def [package tlschan::rustls]] rustls with the ring crypto provider.
+[def [package tlschan::mbedtls]] Mbed TLS 3.6.
+[def [package tlschan::openssl]] OpenSSL 3.
+[list_end]
+
+Normally a program loads [package tlschan], which loads one backend and
+makes its commands [cmd ::tlschan::][arg name]. This page writes the
+commands that way. Each backend package also defines them in the namespace
+of its own name, such as [namespace ::tlschan::wolfssl], with the same
+syntax; requiring a backend directly pins it. Several backends can be loaded
+into one interpreter, together with tcltls (package [package tls]).
+
+[para]
+
+[package tlschan] takes the backends in the order given by the variable
+[var ::tlschan::prefer], set before loading it, else by the environment
+variable [var TLSCHAN_BACKEND], else [const "openssl rustls mbedtls wolfssl"].
+The first of them already loaded is chosen, else the first that loads. If
+none does, [cmd "package require tlschan"] raises
+[const "no TLS backend available (tried openssl, rustls, mbedtls, wolfssl)"]
+with errorCode [const "TLS BACKEND"].
+
+[example {
+namespace eval tlschan {variable prefer {mbedtls openssl}}
+package require tlschan
+}]
+
+[para]
+
+Unless the command [cmd ::tls::socket] exists already, [package tlschan]
+also creates aliases [cmd ::tls::][arg name] for the chosen backend's
+commands, so that code written for tcltls runs unchanged. A tcltls loaded
+afterwards replaces them. A backend package by itself never touches
+[namespace ::tls]. See [sectref COMPATIBILITY] for differences from tcltls
+and tclmtls.
+
+[para]
+
+Only TLS 1.2 and TLS 1.3 are implemented. By default a client opened with
+[cmd tlschan::socket] verifies the server's certificate chain against the
+system trust store and checks that the certificate matches the host name it
+connected to.
+
+[section COMMANDS]
+
+[list_begin definitions]
+
+[call [cmd tlschan::socket] [opt [arg "option value ..."]] [arg host] [arg port]]
+
+Opens a TCP connection with [cmd ::socket] and stacks TLS on it with
+[cmd tlschan::import]. Returns the channel name. [option -async] (which
+takes no value), [option -myaddr] and [option -myport] go to [cmd ::socket].
+[option -autoservername] [arg bool], default [const 1], sets
+[option -servername] to [arg host] when it is not given. All other options,
+after the defaults set with [cmd tlschan::init], go to
+[cmd tlschan::import]; see [sectref OPTIONS].
+
+[para]
+
+Errors from [cmd ::socket] (for example [const "couldn't open socket: connection refused"])
+and from [cmd tlschan::import] are raised unchanged; when the import
+fails the socket is closed. The handshake is not part of this command: it
+runs on first use of the channel, see [sectref "CHANNEL BEHAVIOUR"]. With
+[option -async], a failed connect is reported there, as in
+[const "handshake failed: connection refused"].
+
+[call [cmd tlschan::socket] [option -server] [arg command] [opt [arg "option value ..."]] [arg port]]
+
+Opens a listening socket with [cmd "::socket -server"] and returns it.
+[option -myaddr], [option -reuseaddr] and [option -reuseport] are passed to
+[cmd ::socket]; [option -backlog] is not supported. Every accepted
+connection is imported with [option -server] [const 1],
+[option -model] set to the listening socket, and the other options, then
+[arg command] is called with the channel, the client address and the client
+port appended, as for [cmd "::socket -server"].
+
+[para]
+
+So all accepted connections share one configuration, and with it one
+session ticket key (see [sectref "SESSION RESUMPTION"]): the first
+connection reads the files and evaluates the [option -password] script, and
+later ones reuse the result. An import error (an unreadable
+[option -certfile], for example) closes that connection, is reported
+through [cmd bgerror], and [arg command] is not called; the next connection
+tries again. A [option -model] given here replaces the listening socket.
+
+[call [cmd tlschan::import] [arg channel] [opt [arg "option value ..."]]]
+[call [cmd tlschan::starttls] [arg channel] [opt [arg "option value ..."]]]
+
+Stacks a TLS layer on [arg channel] and returns the channel name, which is
+unchanged. [arg channel] can be any channel open for reading and writing.
+No data is exchanged until the handshake starts, see
+[sectref "CHANNEL BEHAVIOUR"]. The options are described in
+[sectref OPTIONS]. [cmd starttls] is another name for [cmd import].
+
+[para]
+
+Options are checked and files loaded here: a bad option, file or password
+raises an error from this command and leaves the channel as it was.
+
+[call [cmd tlschan::unimport] [arg channel]]
+[call [cmd tlschan::unstack] [arg channel]]
+
+Sends a close_notify alert if the handshake has completed, writes out
+pending TLS data and removes the TLS layer. The channel stays open and
+carries plain data from then on. Raises
+[const "bad channel \"chan\": not a TLS channel"] (errorCode
+[const "TLS CHANNEL"]) if the topmost layer of [arg channel] is not TLS.
+[cmd unstack] is another name for [cmd unimport].
+
+[call [cmd tlschan::handshake] [arg channel]]
+
+Advances the handshake. Returns [const 1] once the handshake has completed
+and [const 0] if it is still in progress, which happens in nonblocking
+mode and inside the channel's [option -validatecommand]; otherwise the
+command waits for the handshake to finish.
+If the handshake failed, raises its error message, such as
+[const "handshake failed: certificate verify failed: certificate has expired"],
+with errorCode [const "TLS HANDSHAKE"]. A
+failed channel raises the same error on every later call.
+
+[call [cmd tlschan::status] [opt [option -local]] [arg channel]]
+
+Returns a dictionary describing the session and the peer's certificate, or
+with [option -local] the local certificate. The dictionary is empty until
+the handshake has completed, and stays empty if it failed. The certificate
+keys are missing when there is no such certificate, for example on a server
+whose client sent none. Session keys:
+
+[list_begin definitions]
+[def "[const protocol] [arg string]"]
+[const TLSv1.2] or [const TLSv1.3], as in tcltls.
+[def "[const cipher] [arg name]"]
+IANA name of the cipher suite, such as [const TLS_AES_256_GCM_SHA384].
+[def "[const sbits] [arg n]"]
+Key size of the symmetric cipher in bits: [const 128] or [const 256].
+[def "[const alpn] [arg protocol]"]
+The protocol agreed through ALPN, or an empty string.
+[def "[const servername] [arg name]"]
+On a client the [option -servername] in use; on a server the name the
+client sent in the SNI extension. Empty if there is none.
+[list_end]
+
+The certificate keys are the same as in the [arg cert] argument of the
+[option -validatecommand] callback:
+
+[list_begin definitions]
+[def "[const certificate] [arg pem]"]
+The certificate in PEM format.
+[def "[const sha1_hash] [arg hex]"]
+[def "[const sha256_hash] [arg hex]"]
+SHA-1 and SHA-256 digest of the DER certificate, in upper case hex.
+[def "[const subject] [arg dn]"]
+[def "[const issuer] [arg dn]"]
+Distinguished names in RFC 2253 form, most significant part last, as in
+[const CN=localhost,O=Example,C=US]. Special characters are escaped with a
+backslash; attributes of unknown type appear as [arg oid][const =#][arg hex].
+[def "[const serialNumber] [arg hex]"]
+[def "[const serial] [arg hex]"]
+The serial number in upper case hex without leading zeros, preceded by
+[const -] if negative. [const serial] is the tcltls 1.7 name.
+[def "[const version] [arg n]"]
+Certificate version, normally [const 3].
+[def "[const signatureAlgorithm] [arg name]"]
+[def "[const signature] [arg name]"]
+Signature algorithm of the certificate (outer and inner field), such as
+[const sha256WithRSAEncryption] or [const ecdsa-with-SHA256]; unknown
+algorithms appear as dotted OIDs.
+[def "[const notBefore] [arg time]"]
+[def "[const notAfter] [arg time]"]
+Validity period as [const "Oct 15 08:03:54 2026 GMT"]; the day of the
+month is padded to two characters with a space.
+[def "[const self_signed] [arg bool]"]
+Whether issuer and subject are the same name.
+[def "[const publicKeyAlgorithm] [arg name]"]
+Such as [const rsaEncryption], [const id-ecPublicKey] or [const ED25519].
+[def "[const bits] [arg n]"]
+Size of the public key: the RSA modulus length, or the curve size for
+elliptic curve keys ([const 256] for P-256). Missing if unknown.
+[def "[const extensions] [arg list]"]
+Names of the certificate's extensions in certificate order, dotted OIDs
+for unknown ones.
+[def "[const num_extensions] [arg n]"]
+Length of that list.
+[def "[const subjectAltName] [arg list]"]
+Subject alternative names, each as [const DNS:][arg name],
+[const "IP Address:"][arg address], [const email:][arg address],
+[const URI:][arg uri], [const DirName:][arg /name] or
+[const "Registered ID:"][arg oid]. IPv6 addresses are written as eight
+colon separated hex groups. Missing without the extension.
+[def "[const subjectKeyIdentifier] [arg hex]"]
+[def "[const authorityKeyIdentifier] [arg hex]"]
+Key identifiers in upper case hex. Missing without the extension.
+[def "[const ocsp] [arg list]"]
+OCSP responder URLs from the authority information access extension.
+Missing if there are none.
+[def "[const ca] [arg bool]"]
+The CA flag of the basic constraints extension; [const 0] without it.
+[list_end]
+
+[call [cmd tlschan::connection] [arg channel]]
+
+Returns a dictionary with the state of the connection, available at any
+time:
+
+[list_begin definitions]
+[def "[const state] [arg state]"]
+[const handshake], [const open] or [const failed].
+[def "[const is_server] [arg bool]"]
+Whether the channel is the server side.
+[def "[const servername] [arg name]"]
+As in [cmd status]; before the handshake has completed, the
+[option -servername] given. Absent when the state is [const failed].
+[def "[const error] [arg message]"]
+Only when the state is [const failed]: the error message.
+[def "[const protocol] [const cipher] [const sbits] [const alpn]"]
+Only when the state is [const open]: as in [cmd status].
+[def "[const session_reused] [arg bool]"]
+Only when the state is [const open]: whether the session was resumed, see
+[sectref "SESSION RESUMPTION"].
+[list_end]
+
+[call [cmd tlschan::init] [opt [arg "option value ..."]]]
+
+Sets the default options of [cmd tlschan::socket], both forms. Each
+call replaces the previous defaults; without arguments it removes them.
+[option -model], [option -server] and [option -servername] are dropped. The
+options are not checked until [cmd socket] uses them.
+[cmd tlschan::import] does not use these defaults. Returns an empty
+string.
+
+[call [cmd tlschan::ciphers] [opt [arg protocol]] [opt [arg verbose]] [opt [arg supported]]]
+
+Returns the IANA names of the cipher suites the library offers for
+certificate based key exchange. [arg protocol] is one of [const ssl2],
+[const ssl3], [const tls1], [const tls1.1], [const tls1.2] or
+[const tls1.3]; the list is empty for the first four. Without
+[arg protocol], suites of both TLS 1.2 and TLS 1.3 are returned.
+[arg verbose] and [arg supported] are accepted for compatibility and
+ignored.
+
+[call [cmd tlschan::protocols]]
+
+Returns the protocols that can be enabled: [const "tls1.2 tls1.3"].
+
+[call [cmd tlschan::version]]
+
+Returns the name and version of the TLS library, such as
+[const "wolfSSL 5.9.4"], [const "rustls 0.23.46"],
+[const "Mbed TLS 3.6.7"] or [const "OpenSSL 3.6.5"].
+
+[call [cmd tlschan::exporter] [arg channel] [arg label] [arg length] [opt [arg context]]]
+
+Returns [arg length] bytes of keying material exported from the session as
+defined by RFC 5705 (TLS 1.2) and RFC 8446 section 7.5 (TLS 1.3).
+[arg length] is 1 to 8160; [arg context] is a byte string. With TLS 1.2
+leaving out [arg context] gives a different result from an empty one; with
+TLS 1.3 the two are the same. Errors:
+[const "the TLS handshake has not completed"] (errorCode
+[const "TLS WRONGSTATE"]), [const "length must be between 1 and 8160"]
+([const "TLS WRONGARGS"]) and [const "keying material export failed"]
+([const "TLS EXPORT"]).
+
+[call [cmd tlschan::randombytes] [arg count]]
+
+Returns [arg count] bytes, 0 to 1048576, from the library's random number
+generator.
+
+[call [cmd tlschan::aesgcm-encrypt] [arg key] [arg plaintext]]
+
+Encrypts [arg plaintext] with AES-256-GCM, without associated data.
+[arg key] must be 32 bytes. Returns a fresh random 12 byte nonce, the
+ciphertext and the 16 byte tag, concatenated: 28 bytes more than
+[arg plaintext].
+
+[call [cmd tlschan::aesgcm-decrypt] [arg key] [arg data]]
+
+Reverses [cmd aesgcm-encrypt]: [arg data] is nonce, ciphertext and tag as
+returned by it. Raises [const "ciphertext too short"] if [arg data] has
+fewer than 28 bytes and [const "AES-GCM authentication failed"] if the tag
+does not match.
+
+[call [cmd tlschan::pbkdf2] [arg digest] [arg password] [arg salt] [arg iterations] [arg length]]
+
+Derives [arg length] bytes, 1 to 64, from [arg password] and [arg salt]
+with PBKDF2 (RFC 8018). [arg digest] is [const sha1], [const sha256] or
+[const sha512], the HMAC hash. [arg iterations] is 1 to 10000000.
+
+[para]
+
+The arguments and results of [cmd randombytes], [cmd aesgcm-encrypt],
+[cmd aesgcm-decrypt] and [cmd pbkdf2] are byte strings; a character above
+U+00FF raises a Tcl error, so convert text with
+[cmd "encoding convertto utf-8"] first. Their own errors have errorCode
+[const "TLS CRYPTO"].
+
+[call [cmd tlschan::pkgconfig] [method list]]
+[call [cmd tlschan::pkgconfig] [method get] [arg key]]
+
+Build information as registered with [fun Tcl_RegisterConfig]. Keys:
+[const version], the package version ([const 0.1.0]), and [const backend],
+one of [const wolfssl], [const rustls], [const mbedtls] or
+[const openssl].
+
+[call [cmd tlschan::backend]]
+
+Only in [package tlschan]: returns the name of the backend it loaded, such
+as [const openssl].
+
+[list_end]
+
+[section OPTIONS]
+
+These options are accepted by [cmd import] and [cmd starttls], by
+[cmd socket] and by [cmd init]. Boolean values are any form Tcl accepts. An
+empty value counts as not given for [option -cadir], [option -cafile],
+[option -cert], [option -certfile], [option -cipher],
+[option -ciphersuites], [option -command], [option -key],
+[option -keyfile], [option -model], [option -password],
+[option -servername], [option -validatecommand] and [option -vcmd].
+
+[list_begin options]
+
+[opt_def -alpn [arg list]]
+Protocol names to negotiate with ALPN (RFC 7301), such as
+[const "h2 http/1.1"]. Each name must be 1 to 255 bytes long, or
+[cmd import] raises [const "invalid ALPN protocol name \"\""] (errorCode
+[const "TLS CONFIG"]). Which common name is chosen depends on the backend,
+see [sectref "BACKEND DIFFERENCES"]. With none in common the handshake
+completes without ALPN.
+
+[opt_def -autoservername [arg bool]]
+Only meaningful to [cmd socket], see there. [cmd import] ignores it.
+
+[opt_def -cadir [arg directory]]
+A directory of trusted CA certificates. The TLS library reads it directly,
+so it must be a native path, not one inside a Tcl virtual filesystem. The
+expected file names differ, see [sectref "BACKEND DIFFERENCES"].
+[option -cadir] and [option -cafile] can be combined.
+
+[opt_def -cafile [arg file]]
+Trusted CA certificates: a PEM file with any number of them, or one DER
+certificate. The file is read through Tcl's filesystem, so it can be inside
+zipfs or another virtual filesystem.
+
+[para]
+
+Without [option -cafile] and [option -cadir] the system trust store is
+used, read when first needed. Where it comes from depends on the backend,
+see [sectref "BACKEND DIFFERENCES"].
+
+[opt_def -cert [arg data]]
+The local certificate as data: PEM text, which may hold the leaf certificate
+followed by intermediates to be sent along, or a single DER certificate.
+Takes precedence over [option -certfile].
+
+[opt_def -certfile [arg file]]
+As [option -cert], read from a file through Tcl's filesystem.
+
+[opt_def -cipher [arg list]]
+The TLS 1.2 cipher suites to enable, replacing the default ones. The list
+holds suite names separated by colons, commas or white space: IANA names
+as [cmd ciphers] returns them
+([const TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256]), the same with
+[const -] for [const _], OpenSSL names
+([const ECDHE-ECDSA-AES128-GCM-SHA256]) or the library's own names, in any
+letter case. OpenSSL cipher string syntax ([const HIGH], [const !aNULL],
+[const @STRENGTH]) is not supported. An unknown name raises
+[const "unknown cipher: "][arg name] (errorCode [const "TLS CONFIG"]).
+
+[opt_def -ciphersuites [arg list]]
+The TLS 1.3 cipher suites to enable, replacing the default ones, in the
+same form, such as [const TLS_CHACHA20_POLY1305_SHA256].
+
+[para]
+
+Names of either protocol may appear in either option: each name is sorted
+to its protocol, and the names a protocol receives replace its defaults. A
+protocol that receives no names keeps its defaults, unless its own option
+was given: [option -cipher] without a TLS 1.2 name disables TLS 1.2, and
+[option -ciphersuites] without a TLS 1.3 name disables TLS 1.3. If that
+leaves no protocol, [cmd import] raises [const "no usable cipher suites"]
+(errorCode [const "TLS CONFIG"]).
+
+[opt_def -command [arg prefix]]
+A command prefix invoked on handshake completion and on failure, see
+[sectref CALLBACKS].
+
+[opt_def -key [arg data]]
+The private key as data, PEM or DER: PKCS#8, PKCS#1 (RSA) or SEC1 (EC).
+Takes precedence over [option -keyfile]. A certificate and a key must be
+given together, and they must match.
+
+[opt_def -keyfile [arg file]]
+As [option -key], read from a file through Tcl's filesystem. Defaults to
+the [option -certfile], so one PEM file can hold both.
+
+[para]
+
+An encrypted key needs [option -password]. PKCS#8 keys encrypted with
+PBES2, as written by [syscmd "openssl pkcs8 -topk8 -v2 aes-256-cbc"], work
+with every backend, in PEM and DER form. Other formats depend on the
+backend, see [sectref "BACKEND DIFFERENCES"].
+
+[opt_def -model [arg channel]]
+Use a shared configuration: certificates, keys, password, trust,
+protocols, cipher suites, ALPN, [option -request] and [option -require]
+come from it, and options of this call that configure them are ignored.
+[option -servername], [option -command] and [option -validatecommand]
+still apply. [arg channel] can be any channel. A TLS channel lends its own
+configuration. Any other channel anchors one: the first import naming it
+creates the configuration from its options, later imports share it, and it
+is released when [arg channel] is closed; channels using it keep it.
+[option -server] must match the configuration, or [cmd import] raises
+[const "-model "][arg channel][const " is configured as a client"] (or
+[const "server"]), errorCode [const "TLS MODEL"]. Sharing a configuration
+saves loading files again and is needed for session resumption, see
+[sectref "SESSION RESUMPTION"].
+
+[opt_def -password [arg script]]
+A script whose result is the password of the private key; the script may
+also end with [cmd "return"] [arg password]. It is evaluated at global
+level, once, by the [cmd import] that creates a configuration with a key,
+whether or not the key is encrypted. An error in the script is raised by
+[cmd import].
+
+[opt_def -request [arg bool]]
+On a server, ask the client for a certificate. Default [const 0]. A
+certificate the client sends is then available through [cmd status]
+whether or not it verifies, unless [option -require] is set. No effect on a
+client.
+
+[opt_def -require [arg bool]]
+On a client, verify the server's certificate chain and host name and fail
+the handshake if they do not verify. Default [const 1]. With [const 0], no
+verification is done, unless [option -validatecommand] is given.
+[para]
+On a server, require a client certificate that verifies against
+[option -cafile], [option -cadir] or the system store; implies
+[option -request]. Default [const 0].
+
+[opt_def -server [arg bool]]
+Act as the server side. Default [const 0]. A server needs a certificate and
+a private key, or [cmd import] raises an error.
+
+[opt_def -servername [arg name]]
+On a client, the name sent in the SNI extension and the name the server's
+certificate must match. An IP address is matched against the certificate's
+IP address entries and is not sent as SNI. Without [option -servername] no
+SNI is sent and only the chain is verified, not the name; unlike
+[cmd socket], [cmd import] does not set it. A value that is neither a host name
+nor an IP address raises [const "invalid server name \""][arg name][const \"]
+(errorCode [const "TLS CONFIG"]). Servers ignore this option.
+
+[opt_def -ssl2 [arg bool]]
+[opt_def -ssl3 [arg bool]]
+[opt_def -tls1 [arg bool]]
+[opt_def -tls1.1 [arg bool]]
+[opt_def -castore [arg uri]]
+[opt_def -dhparams [arg file]]
+[opt_def -post_handshake [arg bool]]
+[opt_def -security_level [arg n]]
+[opt_def -session_id [arg data]]
+Accepted for tcltls compatibility and ignored; the old protocols are never
+enabled.
+
+[opt_def -tls1.2 [arg bool]]
+[opt_def -tls1.3 [arg bool]]
+Enable TLS 1.2 or TLS 1.3. Both default to [const 1]. Disabling both
+raises [const "no protocols enabled"] (errorCode [const "TLS PROTOCOL"]).
+
+[opt_def -validatecommand [arg prefix]]
+[opt_def -vcmd [arg prefix]]
+A command prefix that decides on each certificate the peer sends, see
+[sectref CALLBACKS]. A channel with this callback never resumes a session.
+
+[list_end]
+
+[section CALLBACKS]
+
+[option -command] and [option -validatecommand] are command prefixes: the
+arguments below are appended and the command is evaluated at global level.
+They can run inside any command that does I/O on the channel, or from the
+event loop when the channel is nonblocking. An error in a callback is
+reported through [cmd bgerror] (see [cmd "interp bgerror"]); it does not
+become the result of the command that triggered the callback.
+
+[list_begin definitions]
+
+[def "[arg prefix] [const info] [arg channel] [const handshake] [const done] [const "{SSL negotiation finished successfully}"] [const info]"]
+[option -command], once, when the handshake has completed.
+
+[def "[arg prefix] [const error] [arg channel] [arg message]"]
+[option -command], once, when the channel fails, during the handshake or
+later. [arg message] is the error that I/O on the channel raises from then
+on.
+
+[def "[arg prefix] [const verify] [arg channel] [arg depth] [arg cert] [arg ok] [arg error]"]
+[option -validatecommand], during the handshake, for each certificate the
+peer sent, from the highest [arg depth] down to [const 0], the peer's own
+certificate. Certificates taken from the local trust store are not
+reported. [arg cert] is a dictionary with the certificate keys of
+[cmd status]. [arg ok] is [const 1] if the library accepts this
+certificate and [const 0] if not; [arg error] then gives the reason, such
+as [const "certificate has expired"], [const "hostname mismatch"] or
+[const "issuer certificate not trusted"] for a certificate signed by a
+rejected one, and is empty otherwise.
+
+[para]
+
+A result that is a true boolean or a nonzero integer accepts the
+certificate. Anything else, or an error, rejects it, and the handshake
+fails with [const "handshake failed: certificate rejected by validation callback"].
+The result replaces the library's verdict whatever [option -require] says:
+the callback can accept an expired or untrusted certificate or a name
+mismatch, and can reject a valid one. A client calls it whenever it is
+given; a server only with [option -request] or [option -require], when
+the client sends a certificate.
+
+[para]
+
+The callback may use its channel, but the handshake is still in progress:
+[cmd handshake] returns [const 0], reads return nothing, and what it
+writes is sent once the handshake has completed.
+
+[list_end]
+
+The [option -password] script is not a prefix: it is evaluated as given,
+without arguments, see [sectref OPTIONS].
+
+[section "CHANNEL BEHAVIOUR"]
+
+[list_begin itemized]
+
+[item]
+The TLS channel keeps the name of the channel below. It adds no channel
+options of its own: [cmd "chan configure"] options other than the generic
+ones, such as [option -peername], [option -sockname] or
+[option -keepalive], are those of the channel below.
+
+[item]
+The handshake starts on first use. On a blocking channel the first
+[cmd read], [cmd gets], [cmd flush] or [cmd tlschan::handshake] performs the
+whole handshake and waits for it. On a nonblocking channel the handshake
+proceeds from the event loop: at once if the channel was already
+nonblocking when imported, otherwise after the first read or write attempt
+or once a [cmd "chan event"] handler is set. [cmd tlschan::handshake] also
+advances it. Data written before it completes is buffered and sent
+afterwards. Readable and writable handlers are not called before the
+handshake has completed or failed.
+
+[item]
+A failure is final: every later [cmd read], [cmd gets], [cmd puts] or
+[cmd flush] raises the error, without errorCode, and a nonblocking channel
+becomes readable and writable to report it. During the handshake the
+message is [const "handshake failed: "][arg reason]; afterwards
+[const "read failed: "][arg reason], [const "write failed: "][arg reason],
+[const "connection closed"] or an operating system message such as
+[const "connection reset by peer"]. Either way it can also be
+[const "peer sent alert: "][arg description]. Typical handshake reasons are
+[const "certificate verify failed: "][arg why],
+[const "certificate rejected by validation callback"],
+[const "peer did not return a certificate"] and
+[const "connection closed during handshake"]; [arg why] is one of
+[const "certificate has expired"], [const "certificate is not yet valid"],
+[const "hostname mismatch"], [const "self-signed certificate"],
+[const "unable to get local issuer certificate"] or
+[const "issuer certificate not trusted"], or else the library's own words.
+
+[item]
+In TLS 1.3 a client's handshake completes before the server has checked
+the client certificate. A rejection reaches the client as an alert on its
+next read, as in [const "peer sent alert: certificate required"].
+
+[item]
+The end of the stream is reported as EOF both when the peer sent a
+close_notify alert and when the connection was closed without one.
+
+[item]
+[cmd close] sends a close_notify alert if the handshake has completed,
+writes out pending data, blocking if needed, and closes the channel below.
+Tcl refuses to half-close a stacked channel: [cmd close] [arg channel]
+[const write] raises
+[const "half-close not applicable to stack of transformations"].
+
+[item]
+[cmd fcopy] and [cmd "chan copy"] work in both directions.
+
+[list_end]
+
+[section "SESSION RESUMPTION"]
+
+All backends resume sessions, in TLS 1.2 and TLS 1.3, by the same rules:
+
+[list_begin itemized]
+
+[item]
+A server issues session tickets under a key that belongs to its
+configuration, so it resumes only sessions of connections that shared that
+configuration. The connections accepted by one [cmd "socket -server"]
+share one.
+
+[item]
+A client keeps the most recent session for each server name, for up to 32
+names, in its configuration, and offers it on the next connection to the
+same [option -servername] that uses this configuration. A client therefore
+resumes only when its connections share a configuration through
+[option -model], for example one anchored on a long-lived channel:
+
+[example {
+set model [file tempfile]
+proc https {args} {
+    tlschan::socket -model $::model {*}$args
+}
+http::register https 443 https
+}]
+
+[item]
+There is no resumption for a client without [option -servername], nor for
+a client or a server with [option -validatecommand], whose callback must
+see every handshake.
+
+[item]
+[cmd connection] reports whether a session was resumed as
+[const session_reused].
+
+[list_end]
+
+[section "BACKEND DIFFERENCES"]
+
+The backends behave alike except for the following, observed with
+wolfSSL 5.9.4, rustls 0.23.46, Mbed TLS 3.6.7 and OpenSSL 3.6.5.
+
+[list_begin definitions]
+
+[def "Cipher suites"]
+[package tlschan::wolfssl] and [package tlschan::rustls] have 3 TLS 1.3
+suites and 6 TLS 1.2 suites, all ECDHE with AES-GCM or ChaCha20-Poly1305.
+[package tlschan::mbedtls] and [package tlschan::openssl] add the CCM suites
+to TLS 1.3 and offer many more TLS 1.2 suites (103 and 59 in the builds
+above), including CBC, ARIA, Camellia, DHE and RSA key exchange; their lists
+depend on how the library was built.
+
+[def "ALPN choice"]
+[package tlschan::wolfssl] chooses the first of the client's protocols that
+the server also lists; the others choose the first of the server's protocols
+that the client offers.
+
+[def [option -cadir]]
+[package tlschan::wolfssl] and [package tlschan::mbedtls] load every
+certificate file in the directory. [package tlschan::rustls] loads files
+named [file *.pem], [file *.crt] or like an OpenSSL hash link
+([file 1a2b3c4d.0]). [package tlschan::openssl] needs an OpenSSL hashed
+directory (see [syscmd "openssl rehash"]) and finds only certificates under
+their hash names.
+
+[def "Trust anchors"]
+[package tlschan::openssl] also accepts a certificate that is not a CA,
+given in [option -cafile], as a trust anchor; the others do not.
+
+[def "System trust store"]
+[package tlschan::wolfssl] uses the Windows or macOS store, elsewhere the
+certificates in [file /etc/ssl/certs],
+[file /etc/pki/ca-trust/source/anchors] and [file /etc/pki/tls/certs], or if
+none exists the bundle [file /etc/ssl/cert.pem] (on Haiku
+[file /boot/system/data/ssl/CARootCertificates.pem]); it ignores
+[var SSL_CERT_FILE] and [var SSL_CERT_DIR]. [package tlschan::rustls] uses
+rustls-native-certs, which honours [var SSL_CERT_FILE] and
+[var SSL_CERT_DIR], and falls back to Mozilla's root list when the system
+has none. [package tlschan::mbedtls] reads [var SSL_CERT_FILE] and
+[var SSL_CERT_DIR] if set, else the first CA bundle found at the usual
+places, else [file /etc/ssl/certs]; on Windows it uses the Windows
+certificate store, on macOS the keychain's trust settings.
+[package tlschan::openssl] uses OpenSSL's default locations, which honour
+[var SSL_CERT_FILE] and [var SSL_CERT_DIR], then the usual bundle files, and
+on Windows with OpenSSL 3.2 or later the Windows store.
+
+[def "Encrypted keys"]
+Legacy encrypted PEM keys ([const "Proc-Type: 4,ENCRYPTED"]) and PKCS#8 keys
+encrypted with PBES1, such as PBE-SHA1-3DES, work only with
+[package tlschan::mbedtls] and [package tlschan::openssl];
+[package tlschan::wolfssl] reports [const "unsupported key encryption"] for
+them.
+
+[def "Refused client certificates"]
+The alert a server sends when it refuses a client certificate is the
+library's. For a missing certificate it is [const "certificate required"] in
+TLS 1.3; in TLS 1.2 [package tlschan::wolfssl] and
+[package tlschan::openssl] send [const "handshake failure"],
+[package tlschan::rustls] [const "certificate required"], and
+[package tlschan::mbedtls] closes the connection without an alert, so the
+client reports [const "connection closed during handshake"]. For an
+untrusted certificate it is [const "unknown CA"], from
+[package tlschan::rustls] [const "certificate unknown"]. A
+[package tlschan::mbedtls] server in TLS 1.3 encrypts the alert with keys
+the client no longer reads with, so the client's next read fails with a MAC
+error instead (an Mbed TLS bug); the server still refuses.
+
+[def "Received alerts"]
+[package tlschan::mbedtls] reports a received alert as
+[const "peer sent alert"] without its name: Mbed TLS 3.6 doesn't say which
+one arrived.
+
+[list_end]
+
+[section COMPATIBILITY]
+
+[subsection tcltls]
+
+Code written for tcltls 2 mostly runs unchanged through the
+[cmd ::tls] aliases of [package tlschan], or with [namespace ::tls] replaced
+by [namespace ::tlschan] or a backend's namespace. The differences:
+
+[list_begin itemized]
+
+[item]
+Not provided: [cmd tls::shutdown], [cmd tls::misc], [cmd tls::build-info],
+the sample callbacks [cmd tls::callback], [cmd tls::password] and
+[cmd tls::validate_command], and [var tls::debug]. Added:
+[cmd exporter], [cmd randombytes], [cmd aesgcm-encrypt],
+[cmd aesgcm-decrypt] and [cmd pbkdf2].
+
+[item]
+[cmd status]: [const cipher] is an IANA name,
+also for TLS 1.2, where tcltls uses OpenSSL names; digests are upper case
+hex; [const bits] is the key size, not its security strength. tcltls keys
+not listed under [cmd status], such as [const peername],
+[const verifyResult], [const keyUsage] or [const all], are absent;
+[const self_signed], [const ca], [const num_extensions] and [const ocsp]
+correspond to tcltls's [const selfSigned], [const basicConstraintsCA],
+[const extCount] and [const ocspResponders].
+
+[item]
+[cmd connection]: [const state] is [const handshake], [const open] or
+[const failed], not an OpenSSL state string, and only the keys listed
+there exist.
+
+[item]
+[cmd ciphers] returns IANA names and ignores [arg verbose] and
+[arg supported].
+
+[item]
+[option -command] reports only [const info] (handshake completion) and
+[const error]; there are no [const message] and [const session] calls.
+
+[item]
+[option -validatecommand] is called only with [const verify], not with
+[const alpn], [const hello] or [const sni]. Any true result accepts; tcltls
+treats [const 2] as rejecting without aborting. Certificates from the local
+trust store are not reported.
+
+[item]
+[option -password] is evaluated without arguments; tcltls appends
+[const password], the read/write flag and the maximum length.
+
+[item]
+[option -cert] and [option -key] take PEM as well as DER;
+[option -cafile], [option -certfile] and [option -keyfile] are read through
+Tcl's filesystem.
+
+[item]
+Options without an effect here are accepted and ignored, see
+[sectref OPTIONS].
+
+[item]
+errorCodes begin with [const TLS], see [sectref ERRORS].
+
+[list_end]
+
+[subsection tclmtls]
+
+tclmtls is the package [package mtls] with commands in [namespace ::mtls];
+its names do not clash with these packages. Compared with tclmtls:
+
+[list_begin itemized]
+
+[item]
+There is nothing like [cmd mtls::debug] or [cmd mtls::build-info].
+
+[item]
+[cmd tlschan::pkgconfig] has only the keys [const version] and
+[const backend]; tclmtls's [const client], [const server],
+[arg proto][const ,protocol] and [const version,backend],
+[const name,backend], [const type,backend] are absent.
+
+[item]
+[cmd status] returns more keys, and cipher suites, there and in
+[cmd ciphers], are IANA names ([const TLS_AES_256_GCM_SHA384]) instead of
+Mbed TLS names ([const TLS1-3-AES-256-GCM-SHA384]).
+
+[item]
+errorCodes begin with [const TLS] instead of [const MTLS], and errors of the
+crypto commands are just [const "TLS CRYPTO"], without a further element.
+The crypto commands take and return data in the same formats and with the
+same limits.
+
+[list_end]
+
+[section ERRORS]
+
+Errors raised by the commands have these errorCodes:
+
+[list_begin definitions]
+[def "[const "TLS CONFIG"]"]
+An invalid option value: unparsable certificate, key or CA file, wrong
+password, unknown cipher suite, invalid ALPN name or server name, missing
+certificate on a server.
+[def "[const "TLS PROTOCOL"]"]
+No protocol enabled.
+[def "[const "TLS MODEL"]"]
+The [option -model] configuration is for the other side, client or server.
+[def "[const "TLS IMPORT"]"]
+The session could not be set up.
+[def "[const "TLS CHANNEL"]"]
+The channel is not a TLS channel.
+[def "[const "TLS HANDSHAKE"]"]
+Raised by [cmd handshake] for a failed handshake.
+[def "[const "TLS WRONGSTATE"] [const "TLS WRONGARGS"] [const "TLS EXPORT"]"]
+Raised by [cmd exporter].
+[def "[const "TLS CRYPTO"]"]
+Raised by the crypto commands.
+[def "[const "TLS INIT"]"]
+The library could not be initialised when loading the package.
+[def "[const "TLS BACKEND"]"]
+[package tlschan] found no backend to load.
+[list_end]
+
+Errors opening a file named in an option have a [const POSIX] errorCode;
+errors in arguments have the usual [const TCL] ones. I/O errors on the
+channel do not set errorCode, see [sectref "CHANNEL BEHAVIOUR"].
+
+[section "STATIC LINKING"]
+
+Built with [const BUILD_SHARED_LIBS=OFF], each backend is an archive, such
+as [file libtcl9tlschan_wolfssl0.1.0.a], whose only global symbol is its
+initialisation function: [fun Tlschan_wolfssl_Init],
+[fun Tlschan_rustls_Init], [fun Tlschan_mbedtls_Init] or
+[fun Tlschan_openssl_Init]. The archive uses Tcl's stubs interface, so the
+application also links Tcl's stub library; the pkg-config file
+[file tcl9tlschan_wolfssl.pc] (and so on) names the other libraries to
+link. The application registers the package and declares it in each
+interpreter that is to use it:
+
+[example {
+Tcl_StaticLibrary(NULL, "Tlschan_wolfssl", Tlschan_wolfssl_Init, NULL);
+Tcl_EvalEx(interp,
+    "package ifneeded tlschan::wolfssl 0.1.0 {load {} Tlschan_wolfssl}", -1, 0);
+}]
+
+Pass NULL, not an interpreter: with one, Tcl takes the package as already
+loaded there and never calls [fun Tlschan_wolfssl_Init]. There is no
+safe-interpreter initialisation function.
+
+[para]
+
+[package tlschan] is a script, installed with its [file pkgIndex.tcl] in
+[file lib/tlschan0.1.0] for static builds too. An application ships it in
+its script library, next to the backends it registers, and
+[cmd "package require tlschan"] then picks among those. See
+[file README.md] for building.
+
+[section EXAMPLES]
+
+Fetch a page over HTTPS, verifying the server against the system store:
+
+[example {
+package require tlschan
+package require http
+http::register https 443 ::tlschan::socket
+set tok [http::geturl https://www.tcl-lang.org/]
+puts [http::ncode $tok]
+http::cleanup $tok
+}]
+
+An echo server, event driven:
+
+[example {
+package require tlschan
+
+proc accept {chan addr port} {
+    chan configure $chan -blocking 0 -buffering line
+    chan event $chan readable [list echo $chan]
+}
+
+proc echo {chan} {
+    if {[catch {gets $chan line} n]} {
+        puts stderr "$chan: $n"
+        close $chan
+    } elseif {$n >= 0} {
+        puts $chan $line
+    } elseif {[eof $chan]} {
+        close $chan
+    }
+}
+
+set opts {-certfile server.pem -keyfile server-key.pem}
+tlschan::socket -server accept {*}$opts 8443
+vwait forever
+}]
+
+Switch an established plain connection to TLS, as after a STARTTLS
+command; [option -servername] must be given explicitly:
+
+[example {
+package require tlschan
+set chan [socket mail.example.com 587]
+# ... plain text exchange ending in STARTTLS ...
+tlschan::starttls $chan -servername mail.example.com
+tlschan::handshake $chan
+}]
+
+Accept a server only if its certificate has a known SHA-256 fingerprint,
+such as one shown by [syscmd "openssl x509 -noout -fingerprint -sha256"].
+This one pins the backend by requiring it directly:
+
+[example {
+package require tlschan::mbedtls
+
+proc pin {fingerprint op chan depth cert ok error} {
+    if {$depth > 0} {
+        return 1
+    }
+    set expected [string map {: ""} $fingerprint]
+    string equal -nocase $expected [dict get $cert sha256_hash]
+}
+
+set vcmd [list pin $fingerprint]
+set chan [tlschan::mbedtls::socket -validatecommand $vcmd device.local 8443]
+}]
+
+Mutual TLS: the server requires a client certificate issued by its CA and
+greets the client by name.
+
+[example {
+package require tlschan
+
+proc accept {chan addr port} {
+    chan configure $chan -blocking 0 -buffering line
+    chan event $chan readable [list greet $chan]
+}
+
+proc greet {chan} {
+    if {[catch {gets $chan line} n] || [eof $chan]} {
+        close $chan
+    } elseif {$n >= 0} {
+        puts $chan "hello [dict get [tlschan::status $chan] subject]"
+    }
+}
+
+set opts {-certfile server.pem -keyfile server-key.pem}
+tlschan::socket -server accept -require 1 -cafile client-ca.pem {*}$opts 8443
+vwait forever
+}]
+
+The client:
+
+[example {
+package require tlschan
+set opts {-certfile client.pem -keyfile client-key.pem}
+set chan [tlschan::socket -cafile server-ca.pem {*}$opts server.example.com 8443]
+chan configure $chan -buffering line
+puts $chan hi
+puts [gets $chan]
+}]
+
+Code written for tcltls, unchanged:
+
+[example {
+package require tlschan
+set chan [tls::socket www.tcl-lang.org 443]
+}]
+
+[see_also socket chan http]
+[manpage_end]

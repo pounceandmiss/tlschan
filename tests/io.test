@@ -1,0 +1,729 @@
+# io.test --
+#
+#	Connections over loopback.
+
+source [file join [file dirname [info script]] helpers.tcl]
+
+proc client {port args} {
+    global T ca-cert
+    ${T}::socket -cafile ${ca-cert} {*}$args 127.0.0.1 $port
+}
+
+# child_server accept body that reads until the client goes away.
+set drain_accept {
+    chan configure $c -blocking 0
+    chan event $c readable [list apply {{c} {
+	if {[catch {read $c}] || [eof $c]} {close $c; set ::done 1}
+    }} $c]
+}
+
+test io-1.1 {event driven roundtrip, status} -setup {
+    set port [echo_server]
+} -body {
+    set c [client $port -async]
+    set r [roundtrip $c hello]
+    set st [${T}::status $c]
+    list $r [dict get $st protocol] [dict get $st version] \
+	[dict get $st subject] [dict get $st issuer] \
+	[expr {[dict get $st cipher] in [${T}::ciphers]}] \
+	[expr {[dict get $st sbits] >= 128}] \
+	[dict exists $st sha256_hash] [dict get $::srv(status) protocol]
+} -cleanup {
+    close $c
+    stop_server
+} -result {{ok hello} TLSv1.3 3 CN=localhost,O=Test,C=XX {CN=Test CA,O=Test,C=XX} 1 1 1 TLSv1.3}
+
+test io-1.2 {TLS 1.2 only} -setup {
+    set port [echo_server -tls1.3 0]
+} -body {
+    set c [client $port]
+    list [roundtrip $c x] [dict get [${T}::status $c] protocol]
+} -cleanup {
+    close $c
+    stop_server
+} -result {{ok x} TLSv1.2}
+
+test io-1.3 {status before the handshake is empty} -setup {
+    set port [echo_server]
+} -body {
+    set c [client $port]
+    list [${T}::status $c] [dict get [${T}::connection $c] state]
+} -cleanup {
+    close $c
+    stop_server
+} -result {{} handshake}
+
+test io-1.4 {handshake command, nonblocking} -setup {
+    set port [echo_server]
+} -body {
+    set c [client $port -async]
+    chan configure $c -blocking 0
+    set first [${T}::handshake $c]
+    set n 0
+    while {![${T}::handshake $c] && [incr n] < 500} {
+	after 5 {set ::tick 1}
+	vwait ::tick
+    }
+    list $first [${T}::handshake $c] [dict get [${T}::connection $c] state]
+} -cleanup {
+    close $c
+    stop_server
+} -result {0 1 open}
+
+test io-1.5 {large transfer both ways} -setup {
+    set port [echo_server]
+    set data [string repeat [string repeat x 999]\n 2000]
+} -body {
+    set c [client $port]
+    chan configure $c -blocking 0 -translation lf -buffering full
+    set ::got ""
+    chan event $c readable [list apply {{c} {
+	append ::got [read $c]
+	if {[string length $::got] >= 2000000} {set ::done 1}
+    }} $c]
+    puts -nonewline $c $data
+    flush $c
+    await ::done 20000
+    expr {$::got eq $data}
+} -cleanup {
+    close $c
+    stop_server
+    unset -nocomplain ::got ::done
+} -result 1
+
+test io-1.6 {fcopy through two TLS channels} -setup {
+    set port [echo_server]
+    set data [string repeat [string repeat abcdefghij 100]\n 550]
+    set src [makeFile {} src.txt]
+    set f [open $src wb]
+    puts -nonewline $f $data
+    close $f
+} -body {
+    set c [client $port]
+    chan configure $c -translation binary -blocking 0
+    set in [open $src rb]
+    set out [open [makeFile {} dst.txt] wb]
+    fcopy $in $c -command [list apply {{in c args} {
+	close $in
+	flush $c
+	set ::sent 1
+    }} $in $c]
+    await ::sent
+    fcopy $c $out -size [string length $data] -command {set ::recv}
+    await ::recv 20000
+    close $out
+    expr {[readfile [file join [temporaryDirectory] dst.txt]] eq $data}
+} -cleanup {
+    close $c
+    stop_server
+    unset -nocomplain ::sent ::recv
+} -result 1
+
+test io-1.7 {close_notify gives EOF to the peer} -setup {
+    set port [echo_server]
+} -body {
+    set c [client $port]
+    roundtrip $c hi
+    close $c
+    await ::srv(eof)
+} -cleanup {
+    stop_server
+} -result 1
+
+test io-1.8 {ALPN} -setup {
+    set port [echo_server -alpn {h2 http/1.1}]
+} -body {
+    set c [client $port -alpn {foo http/1.1}]
+    roundtrip $c hi
+    list [dict get [${T}::status $c] alpn] [dict get $::srv(status) alpn]
+} -cleanup {
+    close $c
+    stop_server
+} -result {http/1.1 http/1.1}
+
+test io-1.9 {exporter agrees on both ends} -setup {
+    set port [echo_server]
+} -body {
+    set c [client $port]
+    roundtrip $c hi
+    set a [${T}::exporter $c EXPERIMENTAL-test 32 ctx]
+    set b [${T}::exporter $::srv(chan) EXPERIMENTAL-test 32 ctx]
+    list [string length $a] [expr {$a eq $b}] \
+	[expr {$a ne [${T}::exporter $c EXPERIMENTAL-test 32]}]
+} -cleanup {
+    close $c
+    stop_server
+} -result {32 1 1}
+
+test io-1.10 {exporter before handshake} -setup {
+    set port [echo_server]
+} -body {
+    set c [client $port]
+    ${T}::exporter $c label 16
+} -cleanup {
+    close $c
+    stop_server
+} -returnCodes error -result {the TLS handshake has not completed}
+
+test io-1.11 {-model shares configuration} -setup {
+    set port [echo_server]
+} -body {
+    set c1 [client $port -servername localhost]
+    set s [socket 127.0.0.1 $port]
+    set c2 [${T}::import $s -model $c1 -servername localhost]
+    list [roundtrip $c1 one] [roundtrip $c2 two]
+} -cleanup {
+    close $c1
+    close $c2
+    stop_server
+} -result {{ok one} {ok two}}
+
+test io-1.12 {server name via DNS SAN} -setup {
+    set port [echo_server]
+} -body {
+    roundtrip [set c [client $port -servername localhost]] hi
+} -cleanup {
+    close $c
+    stop_server
+} -result {ok hi}
+
+test io-1.13 {encrypted key with -password} -setup {
+    set port [echo_server -keyfile ${server-key-enc} -password {list secret}]
+} -body {
+    roundtrip [set c [client $port]] hi
+} -cleanup {
+    close $c
+    stop_server
+} -result {ok hi}
+
+test io-1.14 {inline DER cert and key} -setup {
+    set port [echo_server -certfile {} -keyfile {} \
+	-cert [readfile $certs/server-cert.der] \
+	-key [readfile $certs/server-key.der]]
+} -body {
+    roundtrip [set c [client $port]] hi
+} -cleanup {
+    close $c
+    stop_server
+} -result {ok hi}
+
+test io-1.15 {unimport after the handshake leaves a usable socket} -setup {
+    set port [echo_server]
+} -body {
+    set c [client $port]
+    roundtrip $c hi
+    ${T}::unimport $c
+    list [catch {${T}::status $c}] [dict exists [chan configure $c] -peername]
+} -cleanup {
+    close $c
+    stop_server
+} -result {1 1}
+
+test io-1.16 {close before the handshake still delivers} -setup {
+    set ::got {}
+    set s [${T}::socket -certfile ${server-cert} -keyfile ${server-key} \
+	-server {apply {{c a p} {
+	    chan configure $c -blocking 0
+	    chan event $c readable [list apply {{c} {
+		append ::got [read $c]
+		if {[eof $c]} {
+		    close $c
+		    set ::done 1
+		}
+	    }} $c]
+	}}} -myaddr 127.0.0.1 0]
+} -body {
+    set c [client [lindex [chan configure $s -sockname] 2]]
+    chan configure $c -blocking 0
+    puts -nonewline $c hello
+    close $c
+    list [await ::done] $::got
+} -cleanup {
+    close $s
+    unset -nocomplain ::got ::done
+} -result {1 hello}
+
+test io-2.1 {untrusted server certificate} -setup {
+    set port [echo_server -certfile ${selfsigned-cert} -keyfile ${selfsigned-key}]
+} -body {
+    set c [client $port]
+    roundtrip $c hi
+} -cleanup {
+    close $c
+    stop_server
+} -match glob -result {error {*handshake failed: *}}
+
+test io-2.2 {hostname mismatch} -setup {
+    set port [echo_server]
+} -body {
+    set c [client $port -servername example.com]
+    roundtrip $c hi
+} -cleanup {
+    close $c
+    stop_server
+} -match glob -result {error {*handshake failed: *}}
+
+test io-2.3 {-require 0 accepts anything} -setup {
+    set port [echo_server -certfile ${selfsigned-cert} -keyfile ${selfsigned-key}]
+} -body {
+    roundtrip [set c [client $port -require 0 -servername example.com]] hi
+} -cleanup {
+    close $c
+    stop_server
+} -result {ok hi}
+
+test io-2.4 {failed channel keeps failing, connection reports it} -setup {
+    set port [echo_server -certfile ${selfsigned-cert} -keyfile ${selfsigned-key}]
+} -body {
+    set c [client $port]
+    roundtrip $c hi
+    set conn [${T}::connection $c]
+    list [dict get $conn state] [catch {${T}::handshake $c} msg] \
+	[string match "handshake failed: *" $msg] $::errorCode
+} -cleanup {
+    close $c
+    stop_server
+} -result {failed 1 1 {TLS HANDSHAKE}}
+
+test io-2.5 {TLS client against a plain text server} -setup {
+    set l [socket -server [list apply {{s a p} {
+	puts $s "HTTP/1.0 400 Bad Request\r\n\r\n"
+	close $s
+    }}] -myaddr 127.0.0.1 0]
+} -body {
+    roundtrip [set c [client [lindex [chan configure $l -sockname] 2]]] hi
+} -cleanup {
+    close $c
+    close $l
+} -match glob -result {error {*handshake failed: *}}
+
+test io-3.1 {mutual TLS required, no client certificate} -setup {
+    set port [echo_server -require 1 -cafile ${ca-cert}]
+} -body {
+    set c [client $port]
+    set r [roundtrip $c hi]
+    await ::srv(error)
+    list [lindex $r 0] [string match "*handshake failed*" $::srv(error)]
+} -cleanup {
+    close $c
+    stop_server
+} -result {error 1}
+
+test io-3.2 {mutual TLS with a client certificate} -setup {
+    set port [echo_server -require 1 -cafile ${ca-cert}]
+} -body {
+    set c [client $port -certfile ${client-cert} -keyfile ${client-key}]
+    list [roundtrip $c hi] [dict get $::srv(status) subject] \
+	[dict get [${T}::status -local $c] subject]
+} -cleanup {
+    close $c
+    stop_server
+} -result {{ok hi} {CN=Test Client,O=Test,C=XX} {CN=Test Client,O=Test,C=XX}}
+
+test io-4.1 {-validatecommand sees the chain and can reject} -setup {
+    set port [echo_server]
+    set ::seen {}
+} -body {
+    set c [client $port -validatecommand {apply {{op chan depth cert ok err} {
+	lappend ::seen $op $depth [dict get $cert subject] $ok
+	expr {$depth > 0}
+    }}}]
+    set r [roundtrip $c hi]
+    list [lindex $r 0] [lrange $::seen end-3 end]
+} -cleanup {
+    close $c
+    stop_server
+} -result {error {verify 0 CN=localhost,O=Test,C=XX 1}}
+
+test io-4.2 {-validatecommand can accept an untrusted chain} -setup {
+    set port [echo_server -certfile ${selfsigned-cert} -keyfile ${selfsigned-key}]
+    set ::seen {}
+} -body {
+    set c [client $port -vcmd {apply {{op chan depth cert ok err} {
+	lappend ::seen $ok
+	return 1
+    }}}]
+    list [roundtrip $c hi] [lindex $::seen end]
+} -cleanup {
+    close $c
+    stop_server
+} -result {{ok hi} 0}
+
+test io-4.3 {-command reports progress and errors} -setup {
+    set port [echo_server -certfile ${selfsigned-cert} -keyfile ${selfsigned-key}]
+    set ::calls {}
+} -body {
+    set c [client $port -command {apply {{op chan args} {
+	lappend ::calls $op
+    }}}]
+    roundtrip $c hi
+    set ::calls
+} -cleanup {
+    close $c
+    stop_server
+} -result error
+
+test io-4.4 {-command info on success} -setup {
+    set port [echo_server]
+    set ::calls {}
+} -body {
+    set c [client $port -command {apply {{op chan args} {
+	lappend ::calls [list $op {*}$args]
+    }}}]
+    roundtrip $c hi
+    set ::calls
+} -cleanup {
+    close $c
+    stop_server
+} -result {{info handshake done {SSL negotiation finished successfully} info}}
+
+test io-4.5 {callback errors go to bgerror} -setup {
+    set port [echo_server]
+    set ::bg {}
+    interp bgerror {} {apply {{msg opts} {lappend ::bg $msg}}}
+} -body {
+    set c [client $port -command {apply {args {error boom}}}]
+    list [roundtrip $c hi] [update] $::bg
+} -cleanup {
+    close $c
+    stop_server
+    interp bgerror {} ::tcl::Bgerror
+} -result {{ok hi} {} boom}
+
+test io-4.6 {-validatecommand may use its own channel} -setup {
+    set port [echo_server]
+    set ::seen {}
+} -body {
+    set c [client $port -vcmd {apply {args {
+	set c [lindex $args 1]
+	lappend ::seen [${::T}::handshake $c] [read $c 1]
+	puts $c early
+	return 1
+    }}}]
+    set r [roundtrip $c hi]
+    chan event $c readable {if {[gets $c l] >= 0} {set ::line $l}}
+    list $r $::seen [await ::line]
+} -cleanup {
+    close $c
+    stop_server
+    unset -nocomplain ::seen ::line
+} -result {{ok hi} {0 {}} early}
+
+test io-4.7 {-command may close the channel during handshake} -setup {
+    lassign [child_server ${selfsigned-cert} ${selfsigned-key} \
+	$::drain_accept] pipe port
+} -body {
+    set c [client $port -command {apply {{op chan args} {
+	if {$op eq "error"} {close $chan}
+    }}}]
+    list [catch {${T}::handshake $c} msg] $msg [catch {chan configure $c}]
+} -cleanup {
+    close $pipe
+} -match glob -result {1 {handshake failed: *} 1}
+
+test io-5.1 {blocking client, line at a time} -setup {
+    lassign [child_server ${server-cert} ${server-key} {
+	chan configure $c -buffering line
+	catch {
+	    foreach w {one two three} {
+		puts $c $w
+		flush $c
+		after 50
+	    }
+	}
+	catch {close $c}
+	set ::done 1
+    }] pipe port
+} -body {
+    set c [client $port]
+    set lines {}
+    while {[gets $c line] >= 0} {
+	lappend lines $line
+    }
+    list $lines [eof $c]
+} -cleanup {
+    close $c
+    close $pipe
+} -result {{one two three} 1}
+
+test io-5.2 {blocking client sees a handshake failure on flush} -setup {
+    lassign [child_server ${selfsigned-cert} ${selfsigned-key} \
+	$::drain_accept] pipe port
+} -body {
+    set c [client $port]
+    puts $c hi
+    list [catch {flush $c} msg] $msg
+} -cleanup {
+    catch {close $c}
+    close $pipe
+} -match glob -result {1 {handshake failed: *}}
+
+test io-6.1 {no busy loop while a handshake stalls} -constraints linux -setup {
+    set l [socket -server {apply {{s a p} {set ::silent $s}}} \
+	-myaddr 127.0.0.1 0]
+} -body {
+    set c [client [lindex [chan configure $l -sockname] 2] -async]
+    chan configure $c -blocking 0
+    chan event $c readable {set ::never 1}
+    chan event $c writable {set ::never 2}
+    set t0 [cputime]
+    after 1000 {set ::waited 1}
+    vwait ::waited
+    list [info exists ::never] [expr {[cputime] - $t0 < 0.2}]
+} -cleanup {
+    close $c
+    catch {close $::silent}
+    close $l
+    unset -nocomplain ::never ::waited ::silent
+} -result {0 1}
+
+test io-6.2 {no busy loop on an idle open connection} -constraints linux -setup {
+    set port [echo_server]
+} -body {
+    set c [client $port]
+    roundtrip $c hi
+    chan event $c readable {set ::never 1}
+    set t0 [cputime]
+    after 1000 {set ::waited 1}
+    vwait ::waited
+    list [info exists ::never] [expr {[cputime] - $t0 < 0.2}]
+} -cleanup {
+    close $c
+    stop_server
+    unset -nocomplain ::never ::waited
+} -result {0 1}
+
+test io-6.3 {no busy loop after writing to a vanished peer} -constraints linux \
+	-setup {
+    set port [echo_server]
+} -body {
+    set c [client $port]
+    roundtrip $c hi
+    close $::srv(chan)
+    after 100 {set ::waited 1}
+    vwait ::waited
+    chan event $c readable {}
+    catch {puts $c x; flush $c; after 50; puts $c y; flush $c} err
+    set t0 [cputime]
+    after 1000 {set ::waited 1}
+    vwait ::waited
+    list $err [expr {[cputime] - $t0 < 0.2}]
+} -cleanup {
+    catch {close $c}
+    stop_server
+    unset -nocomplain ::waited
+} -match regexp -result {^{(broken pipe|connection reset by peer)} 1$}
+
+test io-6.4 {many concurrent connections} -setup {
+    set port [echo_server]
+} -body {
+    set ::pending 0
+    for {set i 0} {$i < 50} {incr i} {
+	set c [client $port -async]
+	chan configure $c -blocking 0 -buffering line
+	chan event $c readable [list apply {{c i} {
+	    if {[gets $c line] >= 0} {
+		if {$line eq "n$i"} {incr ::pending -1}
+		close $c
+		if {!$::pending} {set ::all 1}
+	    } elseif {[eof $c]} {
+		close $c
+	    }
+	}} $c $i]
+	puts $c n$i
+	incr ::pending
+    }
+    await ::all 20000
+} -cleanup {
+    stop_server
+    unset -nocomplain ::all ::pending
+} -result 1
+
+# Edge cases: expired and self-signed chains, nothing in common to
+# negotiate, failed connects, peers that vanish.
+
+proc chain_file {args} {
+    set data {}
+    foreach f $args {append data [readfile $f]}
+    makeFile $data chain.pem
+}
+
+test io-7.1 {expired server certificate} -setup {
+    set port [echo_server -certfile ${expired-cert} -keyfile ${expired-key}]
+} -body {
+    roundtrip [set c [client $port -servername localhost]] hi
+} -cleanup {
+    catch {close $c}
+    stop_server
+} -match glob -result {error {*certificate verify failed: certificate has expired}}
+
+test io-7.2 {expired intermediate, verdicts per depth} -setup {
+    set port [echo_server -certfile [chain_file ${below-cert} ${inter-cert}] \
+	-keyfile ${below-key}]
+    set ::seen {}
+} -body {
+    set c [client $port -servername localhost \
+	    -vcmd {apply {{op chan depth cert ok err} {
+	lappend ::seen $depth $ok $err
+	return $ok
+    }}}]
+    list [roundtrip $c hi] $::seen
+} -cleanup {
+    catch {close $c}
+    stop_server
+    unset -nocomplain ::seen
+} -match glob -result {{error {*certificate rejected by validation callback}} {1 0 {certificate has expired}}}
+
+test io-7.3 {expired intermediate accepted by the callback} -setup {
+    set port [echo_server -certfile [chain_file ${below-cert} ${inter-cert}] \
+	-keyfile ${below-key}]
+    set ::seen {}
+} -body {
+    set c [client $port -servername localhost \
+	    -vcmd {apply {{op chan depth cert ok err} {
+	lappend ::seen $depth $ok $err
+	return 1
+    }}}]
+    list [roundtrip $c hi] $::seen
+} -cleanup {
+    catch {close $c}
+    stop_server
+    unset -nocomplain ::seen
+} -result {{ok hi} {1 0 {certificate has expired} 0 0 {issuer certificate not trusted}}}
+
+test io-7.4 {self-signed server certificate} -setup {
+    set port [echo_server -certfile ${selfsigned-cert} \
+	-keyfile ${selfsigned-key}]
+} -body {
+    roundtrip [set c [client $port -servername localhost]] hi
+} -cleanup {
+    catch {close $c}
+    stop_server
+} -match glob -result {error {*certificate verify failed: self-signed certificate}}
+
+test io-7.5 {no protocol in common} -setup {
+    set port [echo_server -tls1.3 0]
+} -body {
+    roundtrip [set c [client $port -tls1.2 0]] hi
+} -cleanup {
+    catch {close $c}
+    stop_server
+} -match glob -result {error {handshake failed: *}}
+
+test io-7.6 {no cipher suite in common} -setup {
+    set port [echo_server -tls1.3 0 \
+	-cipher TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256]
+} -body {
+    roundtrip [set c [client $port -tls1.3 0 \
+	-cipher TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384]] hi
+} -cleanup {
+    catch {close $c}
+    stop_server
+} -match glob -result {error {handshake failed: *}}
+
+test io-7.7 {no ALPN protocol in common: carry on without} -setup {
+    set port [echo_server -alpn h2]
+} -body {
+    set c [client $port -alpn http/1.1]
+    list [roundtrip $c hi] [dict get [${T}::status $c] alpn] \
+	[dict get $::srv(status) alpn]
+} -cleanup {
+    close $c
+    stop_server
+} -result {{ok hi} {} {}}
+
+test io-7.8 {-password script returning with return} -setup {
+    set port [echo_server -keyfile ${server-key-enc} \
+	-password {return secret}]
+} -body {
+    roundtrip [set c [client $port]] hi
+} -cleanup {
+    close $c
+    stop_server
+} -result {ok hi}
+
+test io-7.9 {-async connect refused} -setup {
+    set l [socket -server {} -myaddr 127.0.0.1 0]
+    set port [lindex [chan configure $l -sockname] 2]
+    close $l
+} -body {
+    if {[catch {client $port -async} c]} {
+	return $c		;# BSDs refuse a loopback connect at once
+    }
+    roundtrip $c hi
+} -cleanup {
+    catch {close $c}
+} -match regexp -result {^(error {handshake failed: connection refused}|couldn't open socket: connection refused)$}
+
+test io-7.10 {peer gone without close_notify reads as EOF} -setup {
+    lassign [child_server ${server-cert} ${server-key} {
+	chan configure $c -buffering line
+	puts $c bye
+	exit				;# no close_notify
+    }] pipe port
+} -body {
+    set c [client $port]
+    list [gets $c] [gets $c] [eof $c]
+} -cleanup {
+    close $c
+    close $pipe
+} -result {bye {} 1}
+
+# Session resumption: one configuration per server socket, and clients
+# sharing theirs through -model.
+
+proc resumed {port model args} {
+    global T
+    set c [client $port -model $model {*}$args]
+    try {
+	roundtrip $c hi
+	dict get [${T}::connection $c] session_reused
+    } finally {
+	close $c
+    }
+}
+
+foreach {n proto opts} {1 TLS1.3 {} 2 TLS1.2 {-tls1.3 0}} {
+    test io-8.$n "session resumption, $proto" -setup {
+	set port [echo_server {*}$opts]
+	set model [open [info script]]
+    } -body {
+	list [resumed $port $model] [resumed $port $model]
+    } -cleanup {
+	close $model
+	stop_server
+    } -result {0 1}
+}
+
+test io-8.3 {no resumption for a client with -validatecommand} -setup {
+    set port [echo_server]
+    set model [open [info script]]
+} -body {
+    list [resumed $port $model -vcmd {apply {args {return 1}}}] \
+	[resumed $port $model -vcmd {apply {args {return 1}}}]
+} -cleanup {
+    close $model
+    stop_server
+} -result {0 0}
+
+test io-8.4 {no resumption for a server with -validatecommand} -setup {
+    set port [echo_server -request 1 -vcmd {apply {args {
+	incr ::checked
+	return 1
+    }}}]
+    set model [open [info script]]
+    set ::checked 0
+    set r {}
+} -body {
+    foreach i {1 2} {
+	lappend r [resumed $port $model \
+	    -certfile ${::client-cert} -keyfile ${::client-key}]
+    }
+    lappend r [expr {$::checked >= 2}]
+} -cleanup {
+    close $model
+    stop_server
+    unset -nocomplain ::checked r
+} -result {0 0 1}
+
+cleanupTests

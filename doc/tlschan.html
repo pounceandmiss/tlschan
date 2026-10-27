@@ -1,0 +1,961 @@
+<!DOCTYPE html><html><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tlschan - TLS channels for Tcl 9</title>
+<style type="text/css"><!--
+    HTML {
+	background: 	#FFFFFF;
+	color: 		black;
+    }
+    BODY {
+	background: 	#FFFFFF;
+	color:	 	black;
+    }
+    DIV.doctools {
+	margin-left:	10%;
+	margin-right:	10%;
+    }
+    DIV.doctools H1,DIV.doctools H2 {
+	margin-left:	-5%;
+    }
+    H1, H2, H3, H4 {
+	margin-top: 	1em;
+	font-family:	sans-serif;
+	font-size:	large;
+	color:		#005A9C;
+	background: 	transparent;
+	text-align:		left;
+    }
+    H1.doctools_title {
+	text-align: center;
+    }
+    UL,OL {
+	margin-right: 0em;
+	margin-top: 3pt;
+	margin-bottom: 3pt;
+    }
+    UL LI {
+	list-style: disc;
+    }
+    OL LI {
+	list-style: decimal;
+    }
+    DT {
+	padding-top: 	1ex;
+    }
+    UL.doctools_toc,UL.doctools_toc UL, UL.doctools_toc UL UL {
+	font:		normal 12pt/14pt sans-serif;
+	list-style:	none;
+    }
+    LI.doctools_section, LI.doctools_subsection {
+	list-style: 	none;
+	margin-left: 	0em;
+	text-indent:	0em;
+	padding: 	0em;
+    }
+    PRE {
+	display: 	block;
+	font-family:	monospace;
+	white-space:	pre;
+	margin:		0%;
+	padding-top:	0.5ex;
+	padding-bottom:	0.5ex;
+	padding-left:	1ex;
+	padding-right:	1ex;
+	width:		100%;
+    }
+    PRE.doctools_example {
+	color: 		black;
+	background: 	#f5dcb3;
+	border:		1px solid black;
+    }
+    UL.doctools_requirements LI, UL.doctools_syntax LI {
+	list-style: 	none;
+	margin-left: 	0em;
+	text-indent:	0em;
+	padding:	0em;
+    }
+    DIV.doctools_synopsis {
+	color: 		black;
+	background: 	#80ffff;
+	border:		1px solid black;
+	font-family:	serif;
+	margin-top: 	1em;
+	margin-bottom: 	1em;
+    }
+    UL.doctools_syntax {
+	margin-top: 	1em;
+	border-top:	1px solid black;
+    }
+    UL.doctools_requirements {
+	margin-bottom: 	1em;
+	border-bottom:	1px solid black;
+    }
+--></style>
+</head>
+<!-- Generated from file 'tlschan.man' by tcllib/doctools with format 'html'
+   -->
+<!-- tlschan.n
+   -->
+<body><div class="doctools">
+<h1 class="doctools_title">tlschan(n) 0.1 tlschan &quot;TLS channels for Tcl 9&quot;</h1>
+<div id="name" class="doctools_section"><h2><a name="name">Name</a></h2>
+<p>tlschan - TLS 1.2 and 1.3 channels on wolfSSL, rustls, Mbed TLS or OpenSSL</p>
+</div>
+<div id="toc" class="doctools_section"><h2><a name="toc">Table Of Contents</a></h2>
+<ul class="doctools_toc">
+<li class="doctools_section"><a href="#toc">Table Of Contents</a></li>
+<li class="doctools_section"><a href="#synopsis">Synopsis</a></li>
+<li class="doctools_section"><a href="#section1">Description</a></li>
+<li class="doctools_section"><a href="#section2">COMMANDS</a></li>
+<li class="doctools_section"><a href="#section3">OPTIONS</a></li>
+<li class="doctools_section"><a href="#section4">CALLBACKS</a></li>
+<li class="doctools_section"><a href="#section5">CHANNEL BEHAVIOUR</a></li>
+<li class="doctools_section"><a href="#section6">SESSION RESUMPTION</a></li>
+<li class="doctools_section"><a href="#section7">BACKEND DIFFERENCES</a></li>
+<li class="doctools_section"><a href="#section8">COMPATIBILITY</a>
+<ul>
+<li class="doctools_subsection"><a href="#subsection1">tcltls</a></li>
+<li class="doctools_subsection"><a href="#subsection2">tclmtls</a></li>
+</ul>
+</li>
+<li class="doctools_section"><a href="#section9">ERRORS</a></li>
+<li class="doctools_section"><a href="#section10">STATIC LINKING</a></li>
+<li class="doctools_section"><a href="#section11">EXAMPLES</a></li>
+<li class="doctools_section"><a href="#see-also">See Also</a></li>
+<li class="doctools_section"><a href="#keywords">Keywords</a></li>
+<li class="doctools_section"><a href="#category">Category</a></li>
+</ul>
+</div>
+<div id="synopsis" class="doctools_section"><h2><a name="synopsis">Synopsis</a></h2>
+<div class="doctools_synopsis">
+<ul class="doctools_requirements">
+<li>package require <b class="pkgname">Tcl 9.0</b></li>
+<li>package require <b class="pkgname">tlschan <span class="opt">?0.1?</span></b></li>
+<li>package require <b class="pkgname">tlschan::wolfssl <span class="opt">?0.1?</span></b></li>
+<li>package require <b class="pkgname">tlschan::rustls <span class="opt">?0.1?</span></b></li>
+<li>package require <b class="pkgname">tlschan::mbedtls <span class="opt">?0.1?</span></b></li>
+<li>package require <b class="pkgname">tlschan::openssl <span class="opt">?0.1?</span></b></li>
+</ul>
+<ul class="doctools_syntax">
+<li><a href="#1"><b class="cmd">tlschan::socket</b> <span class="opt">?<i class="arg">option value ...</i>?</span> <i class="arg">host</i> <i class="arg">port</i></a></li>
+<li><a href="#2"><b class="cmd">tlschan::socket</b> <b class="option">-server</b> <i class="arg">command</i> <span class="opt">?<i class="arg">option value ...</i>?</span> <i class="arg">port</i></a></li>
+<li><a href="#3"><b class="cmd">tlschan::import</b> <i class="arg">channel</i> <span class="opt">?<i class="arg">option value ...</i>?</span></a></li>
+<li><a href="#4"><b class="cmd">tlschan::starttls</b> <i class="arg">channel</i> <span class="opt">?<i class="arg">option value ...</i>?</span></a></li>
+<li><a href="#5"><b class="cmd">tlschan::unimport</b> <i class="arg">channel</i></a></li>
+<li><a href="#6"><b class="cmd">tlschan::unstack</b> <i class="arg">channel</i></a></li>
+<li><a href="#7"><b class="cmd">tlschan::handshake</b> <i class="arg">channel</i></a></li>
+<li><a href="#8"><b class="cmd">tlschan::status</b> <span class="opt">?<b class="option">-local</b>?</span> <i class="arg">channel</i></a></li>
+<li><a href="#9"><b class="cmd">tlschan::connection</b> <i class="arg">channel</i></a></li>
+<li><a href="#10"><b class="cmd">tlschan::init</b> <span class="opt">?<i class="arg">option value ...</i>?</span></a></li>
+<li><a href="#11"><b class="cmd">tlschan::ciphers</b> <span class="opt">?<i class="arg">protocol</i>?</span> <span class="opt">?<i class="arg">verbose</i>?</span> <span class="opt">?<i class="arg">supported</i>?</span></a></li>
+<li><a href="#12"><b class="cmd">tlschan::protocols</b></a></li>
+<li><a href="#13"><b class="cmd">tlschan::version</b></a></li>
+<li><a href="#14"><b class="cmd">tlschan::exporter</b> <i class="arg">channel</i> <i class="arg">label</i> <i class="arg">length</i> <span class="opt">?<i class="arg">context</i>?</span></a></li>
+<li><a href="#15"><b class="cmd">tlschan::randombytes</b> <i class="arg">count</i></a></li>
+<li><a href="#16"><b class="cmd">tlschan::aesgcm-encrypt</b> <i class="arg">key</i> <i class="arg">plaintext</i></a></li>
+<li><a href="#17"><b class="cmd">tlschan::aesgcm-decrypt</b> <i class="arg">key</i> <i class="arg">data</i></a></li>
+<li><a href="#18"><b class="cmd">tlschan::pbkdf2</b> <i class="arg">digest</i> <i class="arg">password</i> <i class="arg">salt</i> <i class="arg">iterations</i> <i class="arg">length</i></a></li>
+<li><a href="#19"><b class="cmd">tlschan::pkgconfig</b> <b class="method">list</b></a></li>
+<li><a href="#20"><b class="cmd">tlschan::pkgconfig</b> <b class="method">get</b> <i class="arg">key</i></a></li>
+<li><a href="#21"><b class="cmd">tlschan::backend</b></a></li>
+</ul>
+</div>
+</div>
+<div id="section1" class="doctools_section"><h2><a name="section1">Description</a></h2>
+<p>These packages add TLS to Tcl channels by stacking a TLS layer on a socket
+or any other bidirectional channel. Four backend packages share one channel
+layer and one command set and differ only in the TLS library underneath:</p>
+<dl class="doctools_definitions">
+<dt><b class="package">tlschan::wolfssl</b></dt>
+<dd><p>wolfSSL.</p></dd>
+<dt><b class="package">tlschan::rustls</b></dt>
+<dd><p>rustls with the ring crypto provider.</p></dd>
+<dt><b class="package">tlschan::mbedtls</b></dt>
+<dd><p>Mbed TLS 3.6.</p></dd>
+<dt><b class="package">tlschan::openssl</b></dt>
+<dd><p>OpenSSL 3.</p></dd>
+</dl>
+<p>Normally a program loads <b class="package">tlschan</b>, which loads one backend and
+makes its commands <b class="cmd">::tlschan::</b><i class="arg">name</i>. This page writes the
+commands that way. Each backend package also defines them in the namespace
+of its own name, such as <b class="namespace">::tlschan::wolfssl</b>, with the same
+syntax; requiring a backend directly pins it. Several backends can be loaded
+into one interpreter, together with tcltls (package <b class="package">tls</b>).</p>
+<p><b class="package">tlschan</b> takes the backends in the order given by the variable
+<b class="variable">::tlschan::prefer</b>, set before loading it, else by the environment
+variable <b class="variable">TLSCHAN_BACKEND</b>, else <b class="const">openssl rustls mbedtls wolfssl</b>.
+The first of them already loaded is chosen, else the first that loads. If
+none does, <b class="cmd">package require tlschan</b> raises
+<b class="const">no TLS backend available (tried openssl, rustls, mbedtls, wolfssl)</b>
+with errorCode <b class="const">TLS BACKEND</b>.</p>
+<pre class="doctools_example">
+namespace eval tlschan {variable prefer {mbedtls openssl}}
+package require tlschan
+</pre>
+<p>Unless the command <b class="cmd">::tls::socket</b> exists already, <b class="package">tlschan</b>
+also creates aliases <b class="cmd">::tls::</b><i class="arg">name</i> for the chosen backend's
+commands, so that code written for tcltls runs unchanged. A tcltls loaded
+afterwards replaces them. A backend package by itself never touches
+<b class="namespace">::tls</b>. See <span class="sectref"><a href="#section8">COMPATIBILITY</a></span> for differences from tcltls
+and tclmtls.</p>
+<p>Only TLS 1.2 and TLS 1.3 are implemented. By default a client opened with
+<b class="cmd">tlschan::socket</b> verifies the server's certificate chain against the
+system trust store and checks that the certificate matches the host name it
+connected to.</p>
+</div>
+<div id="section2" class="doctools_section"><h2><a name="section2">COMMANDS</a></h2>
+<dl class="doctools_definitions">
+<dt><a name="1"><b class="cmd">tlschan::socket</b> <span class="opt">?<i class="arg">option value ...</i>?</span> <i class="arg">host</i> <i class="arg">port</i></a></dt>
+<dd><p>Opens a TCP connection with <b class="cmd">::socket</b> and stacks TLS on it with
+<b class="cmd">tlschan::import</b>. Returns the channel name. <b class="option">-async</b> (which
+takes no value), <b class="option">-myaddr</b> and <b class="option">-myport</b> go to <b class="cmd">::socket</b>.
+<b class="option">-autoservername</b> <i class="arg">bool</i>, default <b class="const">1</b>, sets
+<b class="option">-servername</b> to <i class="arg">host</i> when it is not given. All other options,
+after the defaults set with <b class="cmd">tlschan::init</b>, go to
+<b class="cmd">tlschan::import</b>; see <span class="sectref"><a href="#section3">OPTIONS</a></span>.</p>
+<p>Errors from <b class="cmd">::socket</b> (for example <b class="const">couldn't open socket: connection refused</b>)
+and from <b class="cmd">tlschan::import</b> are raised unchanged; when the import
+fails the socket is closed. The handshake is not part of this command: it
+runs on first use of the channel, see <span class="sectref"><a href="#section5">CHANNEL BEHAVIOUR</a></span>. With
+<b class="option">-async</b>, a failed connect is reported there, as in
+<b class="const">handshake failed: connection refused</b>.</p></dd>
+<dt><a name="2"><b class="cmd">tlschan::socket</b> <b class="option">-server</b> <i class="arg">command</i> <span class="opt">?<i class="arg">option value ...</i>?</span> <i class="arg">port</i></a></dt>
+<dd><p>Opens a listening socket with <b class="cmd">::socket -server</b> and returns it.
+<b class="option">-myaddr</b>, <b class="option">-reuseaddr</b> and <b class="option">-reuseport</b> are passed to
+<b class="cmd">::socket</b>; <b class="option">-backlog</b> is not supported. Every accepted
+connection is imported with <b class="option">-server</b> <b class="const">1</b>,
+<b class="option">-model</b> set to the listening socket, and the other options, then
+<i class="arg">command</i> is called with the channel, the client address and the client
+port appended, as for <b class="cmd">::socket -server</b>.</p>
+<p>So all accepted connections share one configuration, and with it one
+session ticket key (see <span class="sectref"><a href="#section6">SESSION RESUMPTION</a></span>): the first
+connection reads the files and evaluates the <b class="option">-password</b> script, and
+later ones reuse the result. An import error (an unreadable
+<b class="option">-certfile</b>, for example) closes that connection, is reported
+through <b class="cmd">bgerror</b>, and <i class="arg">command</i> is not called; the next connection
+tries again. A <b class="option">-model</b> given here replaces the listening socket.</p></dd>
+<dt><a name="3"><b class="cmd">tlschan::import</b> <i class="arg">channel</i> <span class="opt">?<i class="arg">option value ...</i>?</span></a></dt>
+<dd></dd>
+<dt><a name="4"><b class="cmd">tlschan::starttls</b> <i class="arg">channel</i> <span class="opt">?<i class="arg">option value ...</i>?</span></a></dt>
+<dd><p>Stacks a TLS layer on <i class="arg">channel</i> and returns the channel name, which is
+unchanged. <i class="arg">channel</i> can be any channel open for reading and writing.
+No data is exchanged until the handshake starts, see
+<span class="sectref"><a href="#section5">CHANNEL BEHAVIOUR</a></span>. The options are described in
+<span class="sectref"><a href="#section3">OPTIONS</a></span>. <b class="cmd">starttls</b> is another name for <b class="cmd">import</b>.</p>
+<p>Options are checked and files loaded here: a bad option, file or password
+raises an error from this command and leaves the channel as it was.</p></dd>
+<dt><a name="5"><b class="cmd">tlschan::unimport</b> <i class="arg">channel</i></a></dt>
+<dd></dd>
+<dt><a name="6"><b class="cmd">tlschan::unstack</b> <i class="arg">channel</i></a></dt>
+<dd><p>Sends a close_notify alert if the handshake has completed, writes out
+pending TLS data and removes the TLS layer. The channel stays open and
+carries plain data from then on. Raises
+<b class="const">bad channel &quot;chan&quot;: not a TLS channel</b> (errorCode
+<b class="const">TLS CHANNEL</b>) if the topmost layer of <i class="arg">channel</i> is not TLS.
+<b class="cmd">unstack</b> is another name for <b class="cmd">unimport</b>.</p></dd>
+<dt><a name="7"><b class="cmd">tlschan::handshake</b> <i class="arg">channel</i></a></dt>
+<dd><p>Advances the handshake. Returns <b class="const">1</b> once the handshake has completed
+and <b class="const">0</b> if it is still in progress, which happens in nonblocking
+mode and inside the channel's <b class="option">-validatecommand</b>; otherwise the
+command waits for the handshake to finish.
+If the handshake failed, raises its error message, such as
+<b class="const">handshake failed: certificate verify failed: certificate has expired</b>,
+with errorCode <b class="const">TLS HANDSHAKE</b>. A
+failed channel raises the same error on every later call.</p></dd>
+<dt><a name="8"><b class="cmd">tlschan::status</b> <span class="opt">?<b class="option">-local</b>?</span> <i class="arg">channel</i></a></dt>
+<dd><p>Returns a dictionary describing the session and the peer's certificate, or
+with <b class="option">-local</b> the local certificate. The dictionary is empty until
+the handshake has completed, and stays empty if it failed. The certificate
+keys are missing when there is no such certificate, for example on a server
+whose client sent none. Session keys:</p>
+<dl class="doctools_definitions">
+<dt><b class="const">protocol</b> <i class="arg">string</i></dt>
+<dd><p><b class="const">TLSv1.2</b> or <b class="const">TLSv1.3</b>, as in tcltls.</p></dd>
+<dt><b class="const">cipher</b> <i class="arg">name</i></dt>
+<dd><p>IANA name of the cipher suite, such as <b class="const">TLS_AES_256_GCM_SHA384</b>.</p></dd>
+<dt><b class="const">sbits</b> <i class="arg">n</i></dt>
+<dd><p>Key size of the symmetric cipher in bits: <b class="const">128</b> or <b class="const">256</b>.</p></dd>
+<dt><b class="const">alpn</b> <i class="arg">protocol</i></dt>
+<dd><p>The protocol agreed through ALPN, or an empty string.</p></dd>
+<dt><b class="const">servername</b> <i class="arg">name</i></dt>
+<dd><p>On a client the <b class="option">-servername</b> in use; on a server the name the
+client sent in the SNI extension. Empty if there is none.</p></dd>
+</dl>
+<p>The certificate keys are the same as in the <i class="arg">cert</i> argument of the
+<b class="option">-validatecommand</b> callback:</p>
+<dl class="doctools_definitions">
+<dt><b class="const">certificate</b> <i class="arg">pem</i></dt>
+<dd><p>The certificate in PEM format.</p></dd>
+<dt><b class="const">sha1_hash</b> <i class="arg">hex</i></dt>
+<dd></dd>
+<dt><b class="const">sha256_hash</b> <i class="arg">hex</i></dt>
+<dd><p>SHA-1 and SHA-256 digest of the DER certificate, in upper case hex.</p></dd>
+<dt><b class="const">subject</b> <i class="arg">dn</i></dt>
+<dd></dd>
+<dt><b class="const">issuer</b> <i class="arg">dn</i></dt>
+<dd><p>Distinguished names in RFC 2253 form, most significant part last, as in
+<b class="const">CN=localhost,O=Example,C=US</b>. Special characters are escaped with a
+backslash; attributes of unknown type appear as <i class="arg">oid</i><b class="const">=#</b><i class="arg">hex</i>.</p></dd>
+<dt><b class="const">serialNumber</b> <i class="arg">hex</i></dt>
+<dd></dd>
+<dt><b class="const">serial</b> <i class="arg">hex</i></dt>
+<dd><p>The serial number in upper case hex without leading zeros, preceded by
+<b class="const">-</b> if negative. <b class="const">serial</b> is the tcltls 1.7 name.</p></dd>
+<dt><b class="const">version</b> <i class="arg">n</i></dt>
+<dd><p>Certificate version, normally <b class="const">3</b>.</p></dd>
+<dt><b class="const">signatureAlgorithm</b> <i class="arg">name</i></dt>
+<dd></dd>
+<dt><b class="const">signature</b> <i class="arg">name</i></dt>
+<dd><p>Signature algorithm of the certificate (outer and inner field), such as
+<b class="const">sha256WithRSAEncryption</b> or <b class="const">ecdsa-with-SHA256</b>; unknown
+algorithms appear as dotted OIDs.</p></dd>
+<dt><b class="const">notBefore</b> <i class="arg">time</i></dt>
+<dd></dd>
+<dt><b class="const">notAfter</b> <i class="arg">time</i></dt>
+<dd><p>Validity period as <b class="const">Oct 15 08:03:54 2026 GMT</b>; the day of the
+month is padded to two characters with a space.</p></dd>
+<dt><b class="const">self_signed</b> <i class="arg">bool</i></dt>
+<dd><p>Whether issuer and subject are the same name.</p></dd>
+<dt><b class="const">publicKeyAlgorithm</b> <i class="arg">name</i></dt>
+<dd><p>Such as <b class="const">rsaEncryption</b>, <b class="const">id-ecPublicKey</b> or <b class="const">ED25519</b>.</p></dd>
+<dt><b class="const">bits</b> <i class="arg">n</i></dt>
+<dd><p>Size of the public key: the RSA modulus length, or the curve size for
+elliptic curve keys (<b class="const">256</b> for P-256). Missing if unknown.</p></dd>
+<dt><b class="const">extensions</b> <i class="arg">list</i></dt>
+<dd><p>Names of the certificate's extensions in certificate order, dotted OIDs
+for unknown ones.</p></dd>
+<dt><b class="const">num_extensions</b> <i class="arg">n</i></dt>
+<dd><p>Length of that list.</p></dd>
+<dt><b class="const">subjectAltName</b> <i class="arg">list</i></dt>
+<dd><p>Subject alternative names, each as <b class="const">DNS:</b><i class="arg">name</i>,
+<b class="const">IP Address:</b><i class="arg">address</i>, <b class="const">email:</b><i class="arg">address</i>,
+<b class="const">URI:</b><i class="arg">uri</i>, <b class="const">DirName:</b><i class="arg">/name</i> or
+<b class="const">Registered ID:</b><i class="arg">oid</i>. IPv6 addresses are written as eight
+colon separated hex groups. Missing without the extension.</p></dd>
+<dt><b class="const">subjectKeyIdentifier</b> <i class="arg">hex</i></dt>
+<dd></dd>
+<dt><b class="const">authorityKeyIdentifier</b> <i class="arg">hex</i></dt>
+<dd><p>Key identifiers in upper case hex. Missing without the extension.</p></dd>
+<dt><b class="const">ocsp</b> <i class="arg">list</i></dt>
+<dd><p>OCSP responder URLs from the authority information access extension.
+Missing if there are none.</p></dd>
+<dt><b class="const">ca</b> <i class="arg">bool</i></dt>
+<dd><p>The CA flag of the basic constraints extension; <b class="const">0</b> without it.</p></dd>
+</dl></dd>
+<dt><a name="9"><b class="cmd">tlschan::connection</b> <i class="arg">channel</i></a></dt>
+<dd><p>Returns a dictionary with the state of the connection, available at any
+time:</p>
+<dl class="doctools_definitions">
+<dt><b class="const">state</b> <i class="arg">state</i></dt>
+<dd><p><b class="const">handshake</b>, <b class="const">open</b> or <b class="const">failed</b>.</p></dd>
+<dt><b class="const">is_server</b> <i class="arg">bool</i></dt>
+<dd><p>Whether the channel is the server side.</p></dd>
+<dt><b class="const">servername</b> <i class="arg">name</i></dt>
+<dd><p>As in <b class="cmd">status</b>; before the handshake has completed, the
+<b class="option">-servername</b> given. Absent when the state is <b class="const">failed</b>.</p></dd>
+<dt><b class="const">error</b> <i class="arg">message</i></dt>
+<dd><p>Only when the state is <b class="const">failed</b>: the error message.</p></dd>
+<dt><b class="const">protocol</b> <b class="const">cipher</b> <b class="const">sbits</b> <b class="const">alpn</b></dt>
+<dd><p>Only when the state is <b class="const">open</b>: as in <b class="cmd">status</b>.</p></dd>
+<dt><b class="const">session_reused</b> <i class="arg">bool</i></dt>
+<dd><p>Only when the state is <b class="const">open</b>: whether the session was resumed, see
+<span class="sectref"><a href="#section6">SESSION RESUMPTION</a></span>.</p></dd>
+</dl></dd>
+<dt><a name="10"><b class="cmd">tlschan::init</b> <span class="opt">?<i class="arg">option value ...</i>?</span></a></dt>
+<dd><p>Sets the default options of <b class="cmd">tlschan::socket</b>, both forms. Each
+call replaces the previous defaults; without arguments it removes them.
+<b class="option">-model</b>, <b class="option">-server</b> and <b class="option">-servername</b> are dropped. The
+options are not checked until <b class="cmd">socket</b> uses them.
+<b class="cmd">tlschan::import</b> does not use these defaults. Returns an empty
+string.</p></dd>
+<dt><a name="11"><b class="cmd">tlschan::ciphers</b> <span class="opt">?<i class="arg">protocol</i>?</span> <span class="opt">?<i class="arg">verbose</i>?</span> <span class="opt">?<i class="arg">supported</i>?</span></a></dt>
+<dd><p>Returns the IANA names of the cipher suites the library offers for
+certificate based key exchange. <i class="arg">protocol</i> is one of <b class="const">ssl2</b>,
+<b class="const">ssl3</b>, <b class="const">tls1</b>, <b class="const">tls1.1</b>, <b class="const">tls1.2</b> or
+<b class="const">tls1.3</b>; the list is empty for the first four. Without
+<i class="arg">protocol</i>, suites of both TLS 1.2 and TLS 1.3 are returned.
+<i class="arg">verbose</i> and <i class="arg">supported</i> are accepted for compatibility and
+ignored.</p></dd>
+<dt><a name="12"><b class="cmd">tlschan::protocols</b></a></dt>
+<dd><p>Returns the protocols that can be enabled: <b class="const">tls1.2 tls1.3</b>.</p></dd>
+<dt><a name="13"><b class="cmd">tlschan::version</b></a></dt>
+<dd><p>Returns the name and version of the TLS library, such as
+<b class="const">wolfSSL 5.9.4</b>, <b class="const">rustls 0.23.46</b>,
+<b class="const">Mbed TLS 3.6.7</b> or <b class="const">OpenSSL 3.6.5</b>.</p></dd>
+<dt><a name="14"><b class="cmd">tlschan::exporter</b> <i class="arg">channel</i> <i class="arg">label</i> <i class="arg">length</i> <span class="opt">?<i class="arg">context</i>?</span></a></dt>
+<dd><p>Returns <i class="arg">length</i> bytes of keying material exported from the session as
+defined by RFC 5705 (TLS 1.2) and RFC 8446 section 7.5 (TLS 1.3).
+<i class="arg">length</i> is 1 to 8160; <i class="arg">context</i> is a byte string. With TLS 1.2
+leaving out <i class="arg">context</i> gives a different result from an empty one; with
+TLS 1.3 the two are the same. Errors:
+<b class="const">the TLS handshake has not completed</b> (errorCode
+<b class="const">TLS WRONGSTATE</b>), <b class="const">length must be between 1 and 8160</b>
+(<b class="const">TLS WRONGARGS</b>) and <b class="const">keying material export failed</b>
+(<b class="const">TLS EXPORT</b>).</p></dd>
+<dt><a name="15"><b class="cmd">tlschan::randombytes</b> <i class="arg">count</i></a></dt>
+<dd><p>Returns <i class="arg">count</i> bytes, 0 to 1048576, from the library's random number
+generator.</p></dd>
+<dt><a name="16"><b class="cmd">tlschan::aesgcm-encrypt</b> <i class="arg">key</i> <i class="arg">plaintext</i></a></dt>
+<dd><p>Encrypts <i class="arg">plaintext</i> with AES-256-GCM, without associated data.
+<i class="arg">key</i> must be 32 bytes. Returns a fresh random 12 byte nonce, the
+ciphertext and the 16 byte tag, concatenated: 28 bytes more than
+<i class="arg">plaintext</i>.</p></dd>
+<dt><a name="17"><b class="cmd">tlschan::aesgcm-decrypt</b> <i class="arg">key</i> <i class="arg">data</i></a></dt>
+<dd><p>Reverses <b class="cmd">aesgcm-encrypt</b>: <i class="arg">data</i> is nonce, ciphertext and tag as
+returned by it. Raises <b class="const">ciphertext too short</b> if <i class="arg">data</i> has
+fewer than 28 bytes and <b class="const">AES-GCM authentication failed</b> if the tag
+does not match.</p></dd>
+<dt><a name="18"><b class="cmd">tlschan::pbkdf2</b> <i class="arg">digest</i> <i class="arg">password</i> <i class="arg">salt</i> <i class="arg">iterations</i> <i class="arg">length</i></a></dt>
+<dd><p>Derives <i class="arg">length</i> bytes, 1 to 64, from <i class="arg">password</i> and <i class="arg">salt</i>
+with PBKDF2 (RFC 8018). <i class="arg">digest</i> is <b class="const">sha1</b>, <b class="const">sha256</b> or
+<b class="const">sha512</b>, the HMAC hash. <i class="arg">iterations</i> is 1 to 10000000.</p>
+<p>The arguments and results of <b class="cmd">randombytes</b>, <b class="cmd">aesgcm-encrypt</b>,
+<b class="cmd">aesgcm-decrypt</b> and <b class="cmd">pbkdf2</b> are byte strings; a character above
+U+00FF raises a Tcl error, so convert text with
+<b class="cmd">encoding convertto utf-8</b> first. Their own errors have errorCode
+<b class="const">TLS CRYPTO</b>.</p></dd>
+<dt><a name="19"><b class="cmd">tlschan::pkgconfig</b> <b class="method">list</b></a></dt>
+<dd></dd>
+<dt><a name="20"><b class="cmd">tlschan::pkgconfig</b> <b class="method">get</b> <i class="arg">key</i></a></dt>
+<dd><p>Build information as registered with <b class="function">Tcl_RegisterConfig</b>. Keys:
+<b class="const">version</b>, the package version (<b class="const">0.1.0</b>), and <b class="const">backend</b>,
+one of <b class="const">wolfssl</b>, <b class="const">rustls</b>, <b class="const">mbedtls</b> or
+<b class="const">openssl</b>.</p></dd>
+<dt><a name="21"><b class="cmd">tlschan::backend</b></a></dt>
+<dd><p>Only in <b class="package">tlschan</b>: returns the name of the backend it loaded, such
+as <b class="const">openssl</b>.</p></dd>
+</dl>
+</div>
+<div id="section3" class="doctools_section"><h2><a name="section3">OPTIONS</a></h2>
+<p>These options are accepted by <b class="cmd">import</b> and <b class="cmd">starttls</b>, by
+<b class="cmd">socket</b> and by <b class="cmd">init</b>. Boolean values are any form Tcl accepts. An
+empty value counts as not given for <b class="option">-cadir</b>, <b class="option">-cafile</b>,
+<b class="option">-cert</b>, <b class="option">-certfile</b>, <b class="option">-cipher</b>,
+<b class="option">-ciphersuites</b>, <b class="option">-command</b>, <b class="option">-key</b>,
+<b class="option">-keyfile</b>, <b class="option">-model</b>, <b class="option">-password</b>,
+<b class="option">-servername</b>, <b class="option">-validatecommand</b> and <b class="option">-vcmd</b>.</p>
+<dl class="doctools_options">
+<dt><b class="option">-alpn</b> <i class="arg">list</i></dt>
+<dd><p>Protocol names to negotiate with ALPN (RFC 7301), such as
+<b class="const">h2 http/1.1</b>. Each name must be 1 to 255 bytes long, or
+<b class="cmd">import</b> raises <b class="const">invalid ALPN protocol name &quot;&quot;</b> (errorCode
+<b class="const">TLS CONFIG</b>). Which common name is chosen depends on the backend,
+see <span class="sectref"><a href="#section7">BACKEND DIFFERENCES</a></span>. With none in common the handshake
+completes without ALPN.</p></dd>
+<dt><b class="option">-autoservername</b> <i class="arg">bool</i></dt>
+<dd><p>Only meaningful to <b class="cmd">socket</b>, see there. <b class="cmd">import</b> ignores it.</p></dd>
+<dt><b class="option">-cadir</b> <i class="arg">directory</i></dt>
+<dd><p>A directory of trusted CA certificates. The TLS library reads it directly,
+so it must be a native path, not one inside a Tcl virtual filesystem. The
+expected file names differ, see <span class="sectref"><a href="#section7">BACKEND DIFFERENCES</a></span>.
+<b class="option">-cadir</b> and <b class="option">-cafile</b> can be combined.</p></dd>
+<dt><b class="option">-cafile</b> <i class="arg">file</i></dt>
+<dd><p>Trusted CA certificates: a PEM file with any number of them, or one DER
+certificate. The file is read through Tcl's filesystem, so it can be inside
+zipfs or another virtual filesystem.</p>
+<p>Without <b class="option">-cafile</b> and <b class="option">-cadir</b> the system trust store is
+used, read when first needed. Where it comes from depends on the backend,
+see <span class="sectref"><a href="#section7">BACKEND DIFFERENCES</a></span>.</p></dd>
+<dt><b class="option">-cert</b> <i class="arg">data</i></dt>
+<dd><p>The local certificate as data: PEM text, which may hold the leaf certificate
+followed by intermediates to be sent along, or a single DER certificate.
+Takes precedence over <b class="option">-certfile</b>.</p></dd>
+<dt><b class="option">-certfile</b> <i class="arg">file</i></dt>
+<dd><p>As <b class="option">-cert</b>, read from a file through Tcl's filesystem.</p></dd>
+<dt><b class="option">-cipher</b> <i class="arg">list</i></dt>
+<dd><p>The TLS 1.2 cipher suites to enable, replacing the default ones. The list
+holds suite names separated by colons, commas or white space: IANA names
+as <b class="cmd">ciphers</b> returns them
+(<b class="const">TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256</b>), the same with
+<b class="const">-</b> for <b class="const">_</b>, OpenSSL names
+(<b class="const">ECDHE-ECDSA-AES128-GCM-SHA256</b>) or the library's own names, in any
+letter case. OpenSSL cipher string syntax (<b class="const">HIGH</b>, <b class="const">!aNULL</b>,
+<b class="const">@STRENGTH</b>) is not supported. An unknown name raises
+<b class="const">unknown cipher: </b><i class="arg">name</i> (errorCode <b class="const">TLS CONFIG</b>).</p></dd>
+<dt><b class="option">-ciphersuites</b> <i class="arg">list</i></dt>
+<dd><p>The TLS 1.3 cipher suites to enable, replacing the default ones, in the
+same form, such as <b class="const">TLS_CHACHA20_POLY1305_SHA256</b>.</p>
+<p>Names of either protocol may appear in either option: each name is sorted
+to its protocol, and the names a protocol receives replace its defaults. A
+protocol that receives no names keeps its defaults, unless its own option
+was given: <b class="option">-cipher</b> without a TLS 1.2 name disables TLS 1.2, and
+<b class="option">-ciphersuites</b> without a TLS 1.3 name disables TLS 1.3. If that
+leaves no protocol, <b class="cmd">import</b> raises <b class="const">no usable cipher suites</b>
+(errorCode <b class="const">TLS CONFIG</b>).</p></dd>
+<dt><b class="option">-command</b> <i class="arg">prefix</i></dt>
+<dd><p>A command prefix invoked on handshake completion and on failure, see
+<span class="sectref"><a href="#section4">CALLBACKS</a></span>.</p></dd>
+<dt><b class="option">-key</b> <i class="arg">data</i></dt>
+<dd><p>The private key as data, PEM or DER: PKCS#8, PKCS#1 (RSA) or SEC1 (EC).
+Takes precedence over <b class="option">-keyfile</b>. A certificate and a key must be
+given together, and they must match.</p></dd>
+<dt><b class="option">-keyfile</b> <i class="arg">file</i></dt>
+<dd><p>As <b class="option">-key</b>, read from a file through Tcl's filesystem. Defaults to
+the <b class="option">-certfile</b>, so one PEM file can hold both.</p>
+<p>An encrypted key needs <b class="option">-password</b>. PKCS#8 keys encrypted with
+PBES2, as written by <b class="syscmd">openssl pkcs8 -topk8 -v2 aes-256-cbc</b>, work
+with every backend, in PEM and DER form. Other formats depend on the
+backend, see <span class="sectref"><a href="#section7">BACKEND DIFFERENCES</a></span>.</p></dd>
+<dt><b class="option">-model</b> <i class="arg">channel</i></dt>
+<dd><p>Use a shared configuration: certificates, keys, password, trust,
+protocols, cipher suites, ALPN, <b class="option">-request</b> and <b class="option">-require</b>
+come from it, and options of this call that configure them are ignored.
+<b class="option">-servername</b>, <b class="option">-command</b> and <b class="option">-validatecommand</b>
+still apply. <i class="arg">channel</i> can be any channel. A TLS channel lends its own
+configuration. Any other channel anchors one: the first import naming it
+creates the configuration from its options, later imports share it, and it
+is released when <i class="arg">channel</i> is closed; channels using it keep it.
+<b class="option">-server</b> must match the configuration, or <b class="cmd">import</b> raises
+<b class="const">-model </b><i class="arg">channel</i><b class="const"> is configured as a client</b> (or
+<b class="const">server</b>), errorCode <b class="const">TLS MODEL</b>. Sharing a configuration
+saves loading files again and is needed for session resumption, see
+<span class="sectref"><a href="#section6">SESSION RESUMPTION</a></span>.</p></dd>
+<dt><b class="option">-password</b> <i class="arg">script</i></dt>
+<dd><p>A script whose result is the password of the private key; the script may
+also end with <b class="cmd">return</b> <i class="arg">password</i>. It is evaluated at global
+level, once, by the <b class="cmd">import</b> that creates a configuration with a key,
+whether or not the key is encrypted. An error in the script is raised by
+<b class="cmd">import</b>.</p></dd>
+<dt><b class="option">-request</b> <i class="arg">bool</i></dt>
+<dd><p>On a server, ask the client for a certificate. Default <b class="const">0</b>. A
+certificate the client sends is then available through <b class="cmd">status</b>
+whether or not it verifies, unless <b class="option">-require</b> is set. No effect on a
+client.</p></dd>
+<dt><b class="option">-require</b> <i class="arg">bool</i></dt>
+<dd><p>On a client, verify the server's certificate chain and host name and fail
+the handshake if they do not verify. Default <b class="const">1</b>. With <b class="const">0</b>, no
+verification is done, unless <b class="option">-validatecommand</b> is given.</p>
+<p>On a server, require a client certificate that verifies against
+<b class="option">-cafile</b>, <b class="option">-cadir</b> or the system store; implies
+<b class="option">-request</b>. Default <b class="const">0</b>.</p></dd>
+<dt><b class="option">-server</b> <i class="arg">bool</i></dt>
+<dd><p>Act as the server side. Default <b class="const">0</b>. A server needs a certificate and
+a private key, or <b class="cmd">import</b> raises an error.</p></dd>
+<dt><b class="option">-servername</b> <i class="arg">name</i></dt>
+<dd><p>On a client, the name sent in the SNI extension and the name the server's
+certificate must match. An IP address is matched against the certificate's
+IP address entries and is not sent as SNI. Without <b class="option">-servername</b> no
+SNI is sent and only the chain is verified, not the name; unlike
+<b class="cmd">socket</b>, <b class="cmd">import</b> does not set it. A value that is neither a host name
+nor an IP address raises <b class="const">invalid server name &quot;</b><i class="arg">name</i><b class="const">&quot;</b>
+(errorCode <b class="const">TLS CONFIG</b>). Servers ignore this option.</p></dd>
+<dt><b class="option">-ssl2</b> <i class="arg">bool</i></dt>
+<dd></dd>
+<dt><b class="option">-ssl3</b> <i class="arg">bool</i></dt>
+<dd></dd>
+<dt><b class="option">-tls1</b> <i class="arg">bool</i></dt>
+<dd></dd>
+<dt><b class="option">-tls1.1</b> <i class="arg">bool</i></dt>
+<dd></dd>
+<dt><b class="option">-castore</b> <i class="arg">uri</i></dt>
+<dd></dd>
+<dt><b class="option">-dhparams</b> <i class="arg">file</i></dt>
+<dd></dd>
+<dt><b class="option">-post_handshake</b> <i class="arg">bool</i></dt>
+<dd></dd>
+<dt><b class="option">-security_level</b> <i class="arg">n</i></dt>
+<dd></dd>
+<dt><b class="option">-session_id</b> <i class="arg">data</i></dt>
+<dd><p>Accepted for tcltls compatibility and ignored; the old protocols are never
+enabled.</p></dd>
+<dt><b class="option">-tls1.2</b> <i class="arg">bool</i></dt>
+<dd></dd>
+<dt><b class="option">-tls1.3</b> <i class="arg">bool</i></dt>
+<dd><p>Enable TLS 1.2 or TLS 1.3. Both default to <b class="const">1</b>. Disabling both
+raises <b class="const">no protocols enabled</b> (errorCode <b class="const">TLS PROTOCOL</b>).</p></dd>
+<dt><b class="option">-validatecommand</b> <i class="arg">prefix</i></dt>
+<dd></dd>
+<dt><b class="option">-vcmd</b> <i class="arg">prefix</i></dt>
+<dd><p>A command prefix that decides on each certificate the peer sends, see
+<span class="sectref"><a href="#section4">CALLBACKS</a></span>. A channel with this callback never resumes a session.</p></dd>
+</dl>
+</div>
+<div id="section4" class="doctools_section"><h2><a name="section4">CALLBACKS</a></h2>
+<p><b class="option">-command</b> and <b class="option">-validatecommand</b> are command prefixes: the
+arguments below are appended and the command is evaluated at global level.
+They can run inside any command that does I/O on the channel, or from the
+event loop when the channel is nonblocking. An error in a callback is
+reported through <b class="cmd">bgerror</b> (see <b class="cmd">interp bgerror</b>); it does not
+become the result of the command that triggered the callback.</p>
+<dl class="doctools_definitions">
+<dt><i class="arg">prefix</i> <b class="const">info</b> <i class="arg">channel</i> <b class="const">handshake</b> <b class="const">done</b> <b class="const">{SSL negotiation finished successfully}</b> <b class="const">info</b></dt>
+<dd><p><b class="option">-command</b>, once, when the handshake has completed.</p></dd>
+<dt><i class="arg">prefix</i> <b class="const">error</b> <i class="arg">channel</i> <i class="arg">message</i></dt>
+<dd><p><b class="option">-command</b>, once, when the channel fails, during the handshake or
+later. <i class="arg">message</i> is the error that I/O on the channel raises from then
+on.</p></dd>
+<dt><i class="arg">prefix</i> <b class="const">verify</b> <i class="arg">channel</i> <i class="arg">depth</i> <i class="arg">cert</i> <i class="arg">ok</i> <i class="arg">error</i></dt>
+<dd><p><b class="option">-validatecommand</b>, during the handshake, for each certificate the
+peer sent, from the highest <i class="arg">depth</i> down to <b class="const">0</b>, the peer's own
+certificate. Certificates taken from the local trust store are not
+reported. <i class="arg">cert</i> is a dictionary with the certificate keys of
+<b class="cmd">status</b>. <i class="arg">ok</i> is <b class="const">1</b> if the library accepts this
+certificate and <b class="const">0</b> if not; <i class="arg">error</i> then gives the reason, such
+as <b class="const">certificate has expired</b>, <b class="const">hostname mismatch</b> or
+<b class="const">issuer certificate not trusted</b> for a certificate signed by a
+rejected one, and is empty otherwise.</p>
+<p>A result that is a true boolean or a nonzero integer accepts the
+certificate. Anything else, or an error, rejects it, and the handshake
+fails with <b class="const">handshake failed: certificate rejected by validation callback</b>.
+The result replaces the library's verdict whatever <b class="option">-require</b> says:
+the callback can accept an expired or untrusted certificate or a name
+mismatch, and can reject a valid one. A client calls it whenever it is
+given; a server only with <b class="option">-request</b> or <b class="option">-require</b>, when
+the client sends a certificate.</p>
+<p>The callback may use its channel, but the handshake is still in progress:
+<b class="cmd">handshake</b> returns <b class="const">0</b>, reads return nothing, and what it
+writes is sent once the handshake has completed.</p></dd>
+</dl>
+<p>The <b class="option">-password</b> script is not a prefix: it is evaluated as given,
+without arguments, see <span class="sectref"><a href="#section3">OPTIONS</a></span>.</p>
+</div>
+<div id="section5" class="doctools_section"><h2><a name="section5">CHANNEL BEHAVIOUR</a></h2>
+<ul class="doctools_itemized">
+<li><p>The TLS channel keeps the name of the channel below. It adds no channel
+options of its own: <b class="cmd">chan configure</b> options other than the generic
+ones, such as <b class="option">-peername</b>, <b class="option">-sockname</b> or
+<b class="option">-keepalive</b>, are those of the channel below.</p></li>
+<li><p>The handshake starts on first use. On a blocking channel the first
+<b class="cmd">read</b>, <b class="cmd">gets</b>, <b class="cmd">flush</b> or <b class="cmd">tlschan::handshake</b> performs the
+whole handshake and waits for it. On a nonblocking channel the handshake
+proceeds from the event loop: at once if the channel was already
+nonblocking when imported, otherwise after the first read or write attempt
+or once a <b class="cmd">chan event</b> handler is set. <b class="cmd">tlschan::handshake</b> also
+advances it. Data written before it completes is buffered and sent
+afterwards. Readable and writable handlers are not called before the
+handshake has completed or failed.</p></li>
+<li><p>A failure is final: every later <b class="cmd">read</b>, <b class="cmd">gets</b>, <b class="cmd">puts</b> or
+<b class="cmd">flush</b> raises the error, without errorCode, and a nonblocking channel
+becomes readable and writable to report it. During the handshake the
+message is <b class="const">handshake failed: </b><i class="arg">reason</i>; afterwards
+<b class="const">read failed: </b><i class="arg">reason</i>, <b class="const">write failed: </b><i class="arg">reason</i>,
+<b class="const">connection closed</b> or an operating system message such as
+<b class="const">connection reset by peer</b>. Either way it can also be
+<b class="const">peer sent alert: </b><i class="arg">description</i>. Typical handshake reasons are
+<b class="const">certificate verify failed: </b><i class="arg">why</i>,
+<b class="const">certificate rejected by validation callback</b>,
+<b class="const">peer did not return a certificate</b> and
+<b class="const">connection closed during handshake</b>; <i class="arg">why</i> is one of
+<b class="const">certificate has expired</b>, <b class="const">certificate is not yet valid</b>,
+<b class="const">hostname mismatch</b>, <b class="const">self-signed certificate</b>,
+<b class="const">unable to get local issuer certificate</b> or
+<b class="const">issuer certificate not trusted</b>, or else the library's own words.</p></li>
+<li><p>In TLS 1.3 a client's handshake completes before the server has checked
+the client certificate. A rejection reaches the client as an alert on its
+next read, as in <b class="const">peer sent alert: certificate required</b>.</p></li>
+<li><p>The end of the stream is reported as EOF both when the peer sent a
+close_notify alert and when the connection was closed without one.</p></li>
+<li><p><b class="cmd">close</b> sends a close_notify alert if the handshake has completed,
+writes out pending data, blocking if needed, and closes the channel below.
+Tcl refuses to half-close a stacked channel: <b class="cmd">close</b> <i class="arg">channel</i>
+<b class="const">write</b> raises
+<b class="const">half-close not applicable to stack of transformations</b>.</p></li>
+<li><p><b class="cmd">fcopy</b> and <b class="cmd">chan copy</b> work in both directions.</p></li>
+</ul>
+</div>
+<div id="section6" class="doctools_section"><h2><a name="section6">SESSION RESUMPTION</a></h2>
+<p>All backends resume sessions, in TLS 1.2 and TLS 1.3, by the same rules:</p>
+<ul class="doctools_itemized">
+<li><p>A server issues session tickets under a key that belongs to its
+configuration, so it resumes only sessions of connections that shared that
+configuration. The connections accepted by one <b class="cmd">socket -server</b>
+share one.</p></li>
+<li><p>A client keeps the most recent session for each server name, for up to 32
+names, in its configuration, and offers it on the next connection to the
+same <b class="option">-servername</b> that uses this configuration. A client therefore
+resumes only when its connections share a configuration through
+<b class="option">-model</b>, for example one anchored on a long-lived channel:</p>
+<pre class="doctools_example">
+set model [file tempfile]
+proc https {args} {
+    tlschan::socket -model $::model {*}$args
+}
+http::register https 443 https
+</pre>
+</li>
+<li><p>There is no resumption for a client without <b class="option">-servername</b>, nor for
+a client or a server with <b class="option">-validatecommand</b>, whose callback must
+see every handshake.</p></li>
+<li><p><b class="cmd">connection</b> reports whether a session was resumed as
+<b class="const">session_reused</b>.</p></li>
+</ul>
+</div>
+<div id="section7" class="doctools_section"><h2><a name="section7">BACKEND DIFFERENCES</a></h2>
+<p>The backends behave alike except for the following, observed with
+wolfSSL 5.9.4, rustls 0.23.46, Mbed TLS 3.6.7 and OpenSSL 3.6.5.</p>
+<dl class="doctools_definitions">
+<dt>Cipher suites</dt>
+<dd><p><b class="package">tlschan::wolfssl</b> and <b class="package">tlschan::rustls</b> have 3 TLS 1.3
+suites and 6 TLS 1.2 suites, all ECDHE with AES-GCM or ChaCha20-Poly1305.
+<b class="package">tlschan::mbedtls</b> and <b class="package">tlschan::openssl</b> add the CCM suites
+to TLS 1.3 and offer many more TLS 1.2 suites (103 and 59 in the builds
+above), including CBC, ARIA, Camellia, DHE and RSA key exchange; their lists
+depend on how the library was built.</p></dd>
+<dt>ALPN choice</dt>
+<dd><p><b class="package">tlschan::wolfssl</b> chooses the first of the client's protocols that
+the server also lists; the others choose the first of the server's protocols
+that the client offers.</p></dd>
+<dt><b class="option">-cadir</b></dt>
+<dd><p><b class="package">tlschan::wolfssl</b> and <b class="package">tlschan::mbedtls</b> load every
+certificate file in the directory. <b class="package">tlschan::rustls</b> loads files
+named &quot;<b class="file">*.pem</b>&quot;, &quot;<b class="file">*.crt</b>&quot; or like an OpenSSL hash link
+(&quot;<b class="file">1a2b3c4d.0</b>&quot;). <b class="package">tlschan::openssl</b> needs an OpenSSL hashed
+directory (see <b class="syscmd">openssl rehash</b>) and finds only certificates under
+their hash names.</p></dd>
+<dt>Trust anchors</dt>
+<dd><p><b class="package">tlschan::openssl</b> also accepts a certificate that is not a CA,
+given in <b class="option">-cafile</b>, as a trust anchor; the others do not.</p></dd>
+<dt>System trust store</dt>
+<dd><p><b class="package">tlschan::wolfssl</b> uses the Windows or macOS store, elsewhere the
+certificates in &quot;<b class="file">/etc/ssl/certs</b>&quot;,
+&quot;<b class="file">/etc/pki/ca-trust/source/anchors</b>&quot; and &quot;<b class="file">/etc/pki/tls/certs</b>&quot;, or if
+none exists the bundle &quot;<b class="file">/etc/ssl/cert.pem</b>&quot; (on Haiku
+&quot;<b class="file">/boot/system/data/ssl/CARootCertificates.pem</b>&quot;); it ignores
+<b class="variable">SSL_CERT_FILE</b> and <b class="variable">SSL_CERT_DIR</b>. <b class="package">tlschan::rustls</b> uses
+rustls-native-certs, which honours <b class="variable">SSL_CERT_FILE</b> and
+<b class="variable">SSL_CERT_DIR</b>, and falls back to Mozilla's root list when the system
+has none. <b class="package">tlschan::mbedtls</b> reads <b class="variable">SSL_CERT_FILE</b> and
+<b class="variable">SSL_CERT_DIR</b> if set, else the first CA bundle found at the usual
+places, else &quot;<b class="file">/etc/ssl/certs</b>&quot;; on Windows it uses the Windows
+certificate store, on macOS the keychain's trust settings.
+<b class="package">tlschan::openssl</b> uses OpenSSL's default locations, which honour
+<b class="variable">SSL_CERT_FILE</b> and <b class="variable">SSL_CERT_DIR</b>, then the usual bundle files, and
+on Windows with OpenSSL 3.2 or later the Windows store.</p></dd>
+<dt>Encrypted keys</dt>
+<dd><p>Legacy encrypted PEM keys (<b class="const">Proc-Type: 4,ENCRYPTED</b>) and PKCS#8 keys
+encrypted with PBES1, such as PBE-SHA1-3DES, work only with
+<b class="package">tlschan::mbedtls</b> and <b class="package">tlschan::openssl</b>;
+<b class="package">tlschan::wolfssl</b> reports <b class="const">unsupported key encryption</b> for
+them.</p></dd>
+<dt>Refused client certificates</dt>
+<dd><p>The alert a server sends when it refuses a client certificate is the
+library's. For a missing certificate it is <b class="const">certificate required</b> in
+TLS 1.3; in TLS 1.2 <b class="package">tlschan::wolfssl</b> and
+<b class="package">tlschan::openssl</b> send <b class="const">handshake failure</b>,
+<b class="package">tlschan::rustls</b> <b class="const">certificate required</b>, and
+<b class="package">tlschan::mbedtls</b> closes the connection without an alert, so the
+client reports <b class="const">connection closed during handshake</b>. For an
+untrusted certificate it is <b class="const">unknown CA</b>, from
+<b class="package">tlschan::rustls</b> <b class="const">certificate unknown</b>. A
+<b class="package">tlschan::mbedtls</b> server in TLS 1.3 encrypts the alert with keys
+the client no longer reads with, so the client's next read fails with a MAC
+error instead (an Mbed TLS bug); the server still refuses.</p></dd>
+<dt>Received alerts</dt>
+<dd><p><b class="package">tlschan::mbedtls</b> reports a received alert as
+<b class="const">peer sent alert</b> without its name: Mbed TLS 3.6 doesn't say which
+one arrived.</p></dd>
+</dl>
+</div>
+<div id="section8" class="doctools_section"><h2><a name="section8">COMPATIBILITY</a></h2>
+<div id="subsection1" class="doctools_subsection"><h3><a name="subsection1">tcltls</a></h3>
+<p>Code written for tcltls 2 mostly runs unchanged through the
+<b class="cmd">::tls</b> aliases of <b class="package">tlschan</b>, or with <b class="namespace">::tls</b> replaced
+by <b class="namespace">::tlschan</b> or a backend's namespace. The differences:</p>
+<ul class="doctools_itemized">
+<li><p>Not provided: <b class="cmd">tls::shutdown</b>, <b class="cmd">tls::misc</b>, <b class="cmd">tls::build-info</b>,
+the sample callbacks <b class="cmd">tls::callback</b>, <b class="cmd">tls::password</b> and
+<b class="cmd">tls::validate_command</b>, and <b class="variable">tls::debug</b>. Added:
+<b class="cmd">exporter</b>, <b class="cmd">randombytes</b>, <b class="cmd">aesgcm-encrypt</b>,
+<b class="cmd">aesgcm-decrypt</b> and <b class="cmd">pbkdf2</b>.</p></li>
+<li><p><b class="cmd">status</b>: <b class="const">cipher</b> is an IANA name,
+also for TLS 1.2, where tcltls uses OpenSSL names; digests are upper case
+hex; <b class="const">bits</b> is the key size, not its security strength. tcltls keys
+not listed under <b class="cmd">status</b>, such as <b class="const">peername</b>,
+<b class="const">verifyResult</b>, <b class="const">keyUsage</b> or <b class="const">all</b>, are absent;
+<b class="const">self_signed</b>, <b class="const">ca</b>, <b class="const">num_extensions</b> and <b class="const">ocsp</b>
+correspond to tcltls's <b class="const">selfSigned</b>, <b class="const">basicConstraintsCA</b>,
+<b class="const">extCount</b> and <b class="const">ocspResponders</b>.</p></li>
+<li><p><b class="cmd">connection</b>: <b class="const">state</b> is <b class="const">handshake</b>, <b class="const">open</b> or
+<b class="const">failed</b>, not an OpenSSL state string, and only the keys listed
+there exist.</p></li>
+<li><p><b class="cmd">ciphers</b> returns IANA names and ignores <i class="arg">verbose</i> and
+<i class="arg">supported</i>.</p></li>
+<li><p><b class="option">-command</b> reports only <b class="const">info</b> (handshake completion) and
+<b class="const">error</b>; there are no <b class="const">message</b> and <b class="const">session</b> calls.</p></li>
+<li><p><b class="option">-validatecommand</b> is called only with <b class="const">verify</b>, not with
+<b class="const">alpn</b>, <b class="const">hello</b> or <b class="const">sni</b>. Any true result accepts; tcltls
+treats <b class="const">2</b> as rejecting without aborting. Certificates from the local
+trust store are not reported.</p></li>
+<li><p><b class="option">-password</b> is evaluated without arguments; tcltls appends
+<b class="const">password</b>, the read/write flag and the maximum length.</p></li>
+<li><p><b class="option">-cert</b> and <b class="option">-key</b> take PEM as well as DER;
+<b class="option">-cafile</b>, <b class="option">-certfile</b> and <b class="option">-keyfile</b> are read through
+Tcl's filesystem.</p></li>
+<li><p>Options without an effect here are accepted and ignored, see
+<span class="sectref"><a href="#section3">OPTIONS</a></span>.</p></li>
+<li><p>errorCodes begin with <b class="const">TLS</b>, see <span class="sectref"><a href="#section9">ERRORS</a></span>.</p></li>
+</ul>
+</div>
+<div id="subsection2" class="doctools_subsection"><h3><a name="subsection2">tclmtls</a></h3>
+<p>tclmtls is the package <b class="package">mtls</b> with commands in <b class="namespace">::mtls</b>;
+its names do not clash with these packages. Compared with tclmtls:</p>
+<ul class="doctools_itemized">
+<li><p>There is nothing like <b class="cmd">mtls::debug</b> or <b class="cmd">mtls::build-info</b>.</p></li>
+<li><p><b class="cmd">tlschan::pkgconfig</b> has only the keys <b class="const">version</b> and
+<b class="const">backend</b>; tclmtls's <b class="const">client</b>, <b class="const">server</b>,
+<i class="arg">proto</i><b class="const">,protocol</b> and <b class="const">version,backend</b>,
+<b class="const">name,backend</b>, <b class="const">type,backend</b> are absent.</p></li>
+<li><p><b class="cmd">status</b> returns more keys, and cipher suites, there and in
+<b class="cmd">ciphers</b>, are IANA names (<b class="const">TLS_AES_256_GCM_SHA384</b>) instead of
+Mbed TLS names (<b class="const">TLS1-3-AES-256-GCM-SHA384</b>).</p></li>
+<li><p>errorCodes begin with <b class="const">TLS</b> instead of <b class="const">MTLS</b>, and errors of the
+crypto commands are just <b class="const">TLS CRYPTO</b>, without a further element.
+The crypto commands take and return data in the same formats and with the
+same limits.</p></li>
+</ul>
+</div>
+</div>
+<div id="section9" class="doctools_section"><h2><a name="section9">ERRORS</a></h2>
+<p>Errors raised by the commands have these errorCodes:</p>
+<dl class="doctools_definitions">
+<dt><b class="const">TLS CONFIG</b></dt>
+<dd><p>An invalid option value: unparsable certificate, key or CA file, wrong
+password, unknown cipher suite, invalid ALPN name or server name, missing
+certificate on a server.</p></dd>
+<dt><b class="const">TLS PROTOCOL</b></dt>
+<dd><p>No protocol enabled.</p></dd>
+<dt><b class="const">TLS MODEL</b></dt>
+<dd><p>The <b class="option">-model</b> configuration is for the other side, client or server.</p></dd>
+<dt><b class="const">TLS IMPORT</b></dt>
+<dd><p>The session could not be set up.</p></dd>
+<dt><b class="const">TLS CHANNEL</b></dt>
+<dd><p>The channel is not a TLS channel.</p></dd>
+<dt><b class="const">TLS HANDSHAKE</b></dt>
+<dd><p>Raised by <b class="cmd">handshake</b> for a failed handshake.</p></dd>
+<dt><b class="const">TLS WRONGSTATE</b> <b class="const">TLS WRONGARGS</b> <b class="const">TLS EXPORT</b></dt>
+<dd><p>Raised by <b class="cmd">exporter</b>.</p></dd>
+<dt><b class="const">TLS CRYPTO</b></dt>
+<dd><p>Raised by the crypto commands.</p></dd>
+<dt><b class="const">TLS INIT</b></dt>
+<dd><p>The library could not be initialised when loading the package.</p></dd>
+<dt><b class="const">TLS BACKEND</b></dt>
+<dd><p><b class="package">tlschan</b> found no backend to load.</p></dd>
+</dl>
+<p>Errors opening a file named in an option have a <b class="const">POSIX</b> errorCode;
+errors in arguments have the usual <b class="const">TCL</b> ones. I/O errors on the
+channel do not set errorCode, see <span class="sectref"><a href="#section5">CHANNEL BEHAVIOUR</a></span>.</p>
+</div>
+<div id="section10" class="doctools_section"><h2><a name="section10">STATIC LINKING</a></h2>
+<p>Built with <b class="const">BUILD_SHARED_LIBS=OFF</b>, each backend is an archive, such
+as &quot;<b class="file">libtcl9tlschan_wolfssl0.1.0.a</b>&quot;, whose only global symbol is its
+initialisation function: <b class="function">Tlschan_wolfssl_Init</b>,
+<b class="function">Tlschan_rustls_Init</b>, <b class="function">Tlschan_mbedtls_Init</b> or
+<b class="function">Tlschan_openssl_Init</b>. The archive uses Tcl's stubs interface, so the
+application also links Tcl's stub library; the pkg-config file
+&quot;<b class="file">tcl9tlschan_wolfssl.pc</b>&quot; (and so on) names the other libraries to
+link. The application registers the package and declares it in each
+interpreter that is to use it:</p>
+<pre class="doctools_example">
+Tcl_StaticLibrary(NULL, &quot;Tlschan_wolfssl&quot;, Tlschan_wolfssl_Init, NULL);
+Tcl_EvalEx(interp,
+    &quot;package ifneeded tlschan::wolfssl 0.1.0 {load {} Tlschan_wolfssl}&quot;, -1, 0);
+</pre>
+<p>Pass NULL, not an interpreter: with one, Tcl takes the package as already
+loaded there and never calls <b class="function">Tlschan_wolfssl_Init</b>. There is no
+safe-interpreter initialisation function.</p>
+<p><b class="package">tlschan</b> is a script, installed with its &quot;<b class="file">pkgIndex.tcl</b>&quot; in
+&quot;<b class="file">lib/tlschan0.1.0</b>&quot; for static builds too. An application ships it in
+its script library, next to the backends it registers, and
+<b class="cmd">package require tlschan</b> then picks among those. See
+&quot;<b class="file">README.md</b>&quot; for building.</p>
+</div>
+<div id="section11" class="doctools_section"><h2><a name="section11">EXAMPLES</a></h2>
+<p>Fetch a page over HTTPS, verifying the server against the system store:</p>
+<pre class="doctools_example">
+package require tlschan
+package require http
+http::register https 443 ::tlschan::socket
+set tok [http::geturl https://www.tcl-lang.org/]
+puts [http::ncode $tok]
+http::cleanup $tok
+</pre>
+<p>An echo server, event driven:</p>
+<pre class="doctools_example">
+package require tlschan
+proc accept {chan addr port} {
+    chan configure $chan -blocking 0 -buffering line
+    chan event $chan readable [list echo $chan]
+}
+proc echo {chan} {
+    if {[catch {gets $chan line} n]} {
+        puts stderr &quot;$chan: $n&quot;
+        close $chan
+    } elseif {$n &gt;= 0} {
+        puts $chan $line
+    } elseif {[eof $chan]} {
+        close $chan
+    }
+}
+set opts {-certfile server.pem -keyfile server-key.pem}
+tlschan::socket -server accept {*}$opts 8443
+vwait forever
+</pre>
+<p>Switch an established plain connection to TLS, as after a STARTTLS
+command; <b class="option">-servername</b> must be given explicitly:</p>
+<pre class="doctools_example">
+package require tlschan
+set chan [socket mail.example.com 587]
+# ... plain text exchange ending in STARTTLS ...
+tlschan::starttls $chan -servername mail.example.com
+tlschan::handshake $chan
+</pre>
+<p>Accept a server only if its certificate has a known SHA-256 fingerprint,
+such as one shown by <b class="syscmd">openssl x509 -noout -fingerprint -sha256</b>.
+This one pins the backend by requiring it directly:</p>
+<pre class="doctools_example">
+package require tlschan::mbedtls
+proc pin {fingerprint op chan depth cert ok error} {
+    if {$depth &gt; 0} {
+        return 1
+    }
+    set expected [string map {: &quot;&quot;} $fingerprint]
+    string equal -nocase $expected [dict get $cert sha256_hash]
+}
+set vcmd [list pin $fingerprint]
+set chan [tlschan::mbedtls::socket -validatecommand $vcmd device.local 8443]
+</pre>
+<p>Mutual TLS: the server requires a client certificate issued by its CA and
+greets the client by name.</p>
+<pre class="doctools_example">
+package require tlschan
+proc accept {chan addr port} {
+    chan configure $chan -blocking 0 -buffering line
+    chan event $chan readable [list greet $chan]
+}
+proc greet {chan} {
+    if {[catch {gets $chan line} n] || [eof $chan]} {
+        close $chan
+    } elseif {$n &gt;= 0} {
+        puts $chan &quot;hello [dict get [tlschan::status $chan] subject]&quot;
+    }
+}
+set opts {-certfile server.pem -keyfile server-key.pem}
+tlschan::socket -server accept -require 1 -cafile client-ca.pem {*}$opts 8443
+vwait forever
+</pre>
+<p>The client:</p>
+<pre class="doctools_example">
+package require tlschan
+set opts {-certfile client.pem -keyfile client-key.pem}
+set chan [tlschan::socket -cafile server-ca.pem {*}$opts server.example.com 8443]
+chan configure $chan -buffering line
+puts $chan hi
+puts [gets $chan]
+</pre>
+<p>Code written for tcltls, unchanged:</p>
+<pre class="doctools_example">
+package require tlschan
+set chan [tls::socket www.tcl-lang.org 443]
+</pre>
+</div>
+<div id="see-also" class="doctools_section"><h2><a name="see-also">See Also</a></h2>
+<p>chan, http, socket</p>
+</div>
+<div id="keywords" class="doctools_section"><h2><a name="keywords">Keywords</a></h2>
+<p>ALPN, Mbed TLS, OpenSSL, SSL, TLS, X.509, certificate, channel, https, rustls, socket, wolfSSL</p>
+</div>
+<div id="category" class="doctools_section"><h2><a name="category">Category</a></h2>
+<p>Networking</p>
+</div>
+</div></body></html>

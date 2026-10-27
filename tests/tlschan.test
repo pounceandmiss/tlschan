@@ -1,0 +1,69 @@
+# tlschan.test --
+#
+#	The umbrella package, which loads whichever backend is available. Each
+#	case runs in a fresh interpreter process, since loading is for good.
+
+source [file join [file dirname [info script]] helpers.tcl]
+
+set b [namespace tail $pkg]
+
+# Runs script in a new process, with env as extra environment; its result.
+proc fresh {script {env {}}} {
+    set saved [array get ::env]
+    try {
+	array set ::env $env
+	exec [interpreter] << "puts \[$script\]"
+    } finally {
+	foreach {k v} $env {
+	    unset ::env($k)
+	}
+	array set ::env $saved
+    }
+}
+
+test tlschan-1.1 {::tlschan::prefer picks the backend} -body {
+    fresh "namespace eval tlschan {variable prefer {nosuch $b}}
+	package require tlschan
+	tlschan::backend"
+} -result $b
+
+test tlschan-1.2 {TLSCHAN_BACKEND picks the backend} -body {
+    fresh {package require tlschan; tlschan::backend} [list TLSCHAN_BACKEND $b]
+} -result $b
+
+test tlschan-1.3 {a backend already loaded is taken first} -body {
+    fresh "package require $pkg; package require tlschan; tlschan::backend"
+} -result $b
+
+test tlschan-1.4 {nothing available} -body {
+    fresh {
+	namespace eval tlschan {variable prefer {nosuch other}}
+	list [catch {package require tlschan} m] $m $::errorCode
+    }
+} -result {1 {no TLS backend available (tried nosuch, other)} {TLS BACKEND}}
+
+test tlschan-2.1 {commands and tcltls aliases go to the backend} -body {
+    fresh "namespace eval tlschan {variable prefer $b}; package require tlschan
+	list \[interp alias {} ::tlschan::socket\] \[interp alias {} ::tls::status\]"
+} -result [list ::tlschan::${b}::socket ::tlschan::${b}::status]
+
+test tlschan-2.2 {an existing ::tls::socket is left alone} -body {
+    fresh "namespace eval ::tls {proc socket args {}}
+	namespace eval tlschan {variable prefer $b}; package require tlschan
+	list \[interp alias {} ::tls::socket\] \[interp alias {} ::tls::status\]"
+} -result {{} {}}
+
+test tlschan-3.1 {a connection through tlschan::socket} -setup {
+    set port [echo_server]
+} -body {
+    # This process has $pkg loaded already, so tlschan takes it.
+    package require tlschan
+    set c [tlschan::socket -cafile ${ca-cert} 127.0.0.1 $port]
+    list [tlschan::backend] [roundtrip $c hello] \
+	[dict get [tlschan::status $c] protocol]
+} -cleanup {
+    catch {close $c}
+    stop_server
+} -match glob -result [list $b {ok hello} TLSv1.*]
+
+cleanupTests

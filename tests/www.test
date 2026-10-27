@@ -1,0 +1,72 @@
+# www.test --
+#
+#	Real servers; run with TLS_NETWORK=1.
+
+source [file join [file dirname [info script]] helpers.tcl]
+package require http
+
+proc fetch {url args} {
+    set tok [http::geturl $url -timeout 15000 {*}$args]
+    try {
+	list [http::status $tok] [http::ncode $tok]
+    } finally {
+	http::cleanup $tok
+    }
+}
+
+foreach {n host} {1 www.google.com 2 github.com 3 www.tcl-lang.org
+	4 www.cloudflare.com} {
+    test www-1.$n "https://$host with the system store" -constraints network \
+	    -setup {
+	http::register https 443 ${T}::socket
+    } -body {
+	lindex [fetch https://$host/] 0
+    } -cleanup {
+	http::unregister https
+    } -result ok
+}
+
+test www-1.5 {nonblocking http::geturl with -command} -constraints network \
+	-setup {
+    http::register https 443 ${T}::socket
+} -body {
+    http::geturl https://www.google.com/ -timeout 15000 \
+	-command {apply {{tok} {
+	    set ::www [http::status $tok]
+	    http::cleanup $tok
+	}}}
+    await ::www 20000
+} -cleanup {
+    http::unregister https
+    unset -nocomplain ::www
+} -result ok
+
+foreach {n host} {1 expired 2 wrong.host 3 self-signed 4 untrusted-root} {
+    test www-2.$n "$host.badssl.com is refused" -constraints network -body {
+	set c [${T}::socket $host.badssl.com 443]
+	puts -nonewline $c "HEAD / HTTP/1.0\r\n\r\n"
+	flush $c
+    } -cleanup {
+	catch {close $c}
+    } -returnCodes error -match glob -result {*handshake failed: *}
+}
+
+# badssl.com drops some connections from OpenSSL 3.6 clients (the openssl
+# command line too), so a failed attempt gets one retry.
+test www-2.5 {badssl with -require 0} -constraints network -body {
+    foreach try {1 2} {
+	if {![catch {
+	    set c [${T}::socket -require 0 expired.badssl.com 443]
+	    puts -nonewline $c \
+		"HEAD / HTTP/1.0\r\nHost: expired.badssl.com\r\n\r\n"
+	    flush $c
+	    gets $c
+	} r]} break
+	catch {close $c}
+    }
+    set r
+} -cleanup {
+    catch {close $c}
+} -match glob -result {HTTP/1.1 *}
+
+cleanupTests
