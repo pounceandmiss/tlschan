@@ -72,6 +72,14 @@ endforeach()
 # The decoder test links Tcl itself and libcrypto for reference digests.
 find_program(OPENSSL_CLI openssl)
 find_package(OpenSSL COMPONENTS Crypto QUIET)
+if(OPENSSL_CLI)
+    # LibreSSL's (macOS, OpenBSD) prints differently.
+    execute_process(COMMAND ${OPENSSL_CLI} version OUTPUT_VARIABLE version
+	ERROR_QUIET)
+    if(NOT version MATCHES "^OpenSSL [3-9]")
+	set(OPENSSL_CLI "")
+    endif()
+endif()
 if(TARGET Tcl::tcl AND OPENSSL_CLI AND OpenSSL_FOUND
 	AND NOT CMAKE_CROSSCOMPILING)
     add_executable(test_x509 x509/test_x509.c ${PROJECT_SOURCE_DIR}/generic/x509.c)

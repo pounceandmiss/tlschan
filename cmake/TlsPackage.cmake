@@ -98,7 +98,7 @@ ${name} ${ver} [list load [file join $dir $<TARGET_FILE_NAME:${pkg}>] ${prefix}]
 	add_custom_command(OUTPUT ${archive}
 	    COMMAND ${CMAKE_COMMAND} -DLD=${CMAKE_LINKER} -DOBJCOPY=${CMAKE_OBJCOPY}
 		-DAR=${CMAKE_AR} -DAPPLE=${APPLE} -DINIT=${init} -DOUT=${archive}
-		-DMINGW=${MINGW} -DNM=${CMAKE_NM}
+		-DMINGW=${MINGW} -DNM=${CMAKE_NM} -DOBJDUMP=${CMAKE_OBJDUMP}
 		"-DINPUTS=$<TARGET_OBJECTS:${pkg}_core>;${parts};${arg_ARCHIVES}"
 		-P ${PROJECT_SOURCE_DIR}/cmake/Prelink.cmake
 	    DEPENDS ${pkg}_core ${arg_OBJECTS} ${arg_DEPENDS} ${arg_ARCHIVES}
