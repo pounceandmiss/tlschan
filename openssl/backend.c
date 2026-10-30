@@ -210,6 +210,7 @@ SysOnce(void)
 	"/etc/pki/tls/certs/ca-bundle.crt",	/* Fedora, RHEL */
 	"/etc/ssl/ca-bundle.pem",		/* openSUSE */
 	"/etc/ssl/cert.pem",			/* BSDs, Alpine */
+	"/boot/system/data/ssl/CARootCertificates.pem",	/* Haiku */
 	NULL
     };
     int i;

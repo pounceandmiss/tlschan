@@ -41,32 +41,51 @@ test www-1.5 {nonblocking http::geturl with -command} -constraints network \
     unset -nocomplain ::www
 } -result ok
 
+# badssl.com drops some handshakes from OpenSSL 3.5 and later, silently or
+# not (the openssl command line's too), so it gets a deadline and retries.
+proc badssl {host args} {
+    global T
+    foreach try {1 2 3} {
+	set c [${T}::socket {*}$args $host.badssl.com 443]
+	fconfigure $c -blocking 0
+	fileevent $c readable {set ::www ready}
+	set state ready
+	while {$state eq "ready"} {
+	    if {[catch {${T}::handshake $c} done]} {
+		set state $done
+	    } elseif {$done} {
+		fileevent $c readable {}
+		fconfigure $c -blocking 1
+		return $c
+	    } else {
+		unset -nocomplain ::www
+		set state [await ::www 10000]
+	    }
+	}
+	close $c
+	if {$state ne "timeout" && ![string match *closed* $state]} {
+	    return -code error $state
+	}
+    }
+    error "no handshake with $host.badssl.com"
+}
+
 foreach {n host} {1 expired 2 wrong.host 3 self-signed 4 untrusted-root} {
     test www-2.$n "$host.badssl.com is refused" -constraints network -body {
-	set c [${T}::socket $host.badssl.com 443]
-	puts -nonewline $c "HEAD / HTTP/1.0\r\n\r\n"
-	flush $c
+	badssl $host
     } -cleanup {
-	catch {close $c}
+	unset -nocomplain ::www
     } -returnCodes error -match glob -result {*handshake failed: *}
 }
 
-# badssl.com drops some connections from OpenSSL 3.6 clients (the openssl
-# command line too), so a failed attempt gets one retry.
 test www-2.5 {badssl with -require 0} -constraints network -body {
-    foreach try {1 2} {
-	if {![catch {
-	    set c [${T}::socket -require 0 expired.badssl.com 443]
-	    puts -nonewline $c \
-		"HEAD / HTTP/1.0\r\nHost: expired.badssl.com\r\n\r\n"
-	    flush $c
-	    gets $c
-	} r]} break
-	catch {close $c}
-    }
-    set r
+    set c [badssl expired -require 0]
+    puts -nonewline $c "HEAD / HTTP/1.0\r\nHost: expired.badssl.com\r\n\r\n"
+    flush $c
+    gets $c
 } -cleanup {
     catch {close $c}
+    unset -nocomplain ::www
 } -match glob -result {HTTP/1.1 *}
 
 cleanupTests

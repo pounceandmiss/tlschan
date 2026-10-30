@@ -130,7 +130,20 @@ if(APPLE)
     file(REMOVE "${obj}.tmp.o")
 else()
     run("${LD}" -r -d -o "${obj}" ${inputs})
-    run("${OBJCOPY}" --keep-global-symbol=${INIT} "${obj}")
+    # lld has no -d, and a common symbol made local would end up absolute:
+    # each stays global under a name of the package's own.
+    execute_process(COMMAND "${NM}" "${obj}" OUTPUT_VARIABLE syms
+	COMMAND_ERROR_IS_FATAL ANY)
+    string(REGEX MATCHALL " C [^\n]+" commons "${syms}")
+    set(args "--keep-global-symbol=${INIT}\n")
+    foreach(c IN LISTS commons)
+	string(SUBSTRING "${c}" 3 -1 c)
+	string(APPEND args "--redefine-sym ${c}=${c}.${INIT}\n"
+	    "--keep-global-symbol=${c}\n--keep-global-symbol=${c}.${INIT}\n")
+    endforeach()
+    file(WRITE "${obj}.args" "${args}")
+    run("${OBJCOPY}" "@${obj}.args" "${obj}")
+    file(REMOVE "${obj}.args")
 endif()
 
 set(used)
